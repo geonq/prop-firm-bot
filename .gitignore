@@ -1,0 +1,31 @@
+.env
+venv/
+__pycache__/
+.DS_Store
+*.pyc
+.vscode/
+.openclaw/
+.ipynb_checkpoints/
+*.egg-info/
+.pytest_cache/
+
+# Claude-specific context files — never push to repo
+CLAUDE.md
+REFERENCE.md
+.claude/
+.claude.json
+Tasks/todo.md
+
+# Proprietary trading strategy artifacts — never push to repo
+# (the prop firm rule encoding stays public; the actual strategy stays private)
+PineScripts/
+*.pine
+TVExports/
+optimizer_output/
+optimizer_results/
+backtest_results/
+strategy_params.json
+strategy_params.yaml
+strategy_config.json
+strategy_config.yaml
+final_strategy/
