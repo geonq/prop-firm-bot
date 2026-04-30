@@ -27,6 +27,7 @@ Prop Firm Bot/
 ├── Rulesets/                  # rule documents pulled from official sources
 │   ├── LucidFlex/
 │   └── TopStep/
+├── Sources/                   # verbatim primary-source documents (e.g. founding-thesis transcript)
 ├── Coordination/              # tracked Codex/Claude handoff + changelog
 ├── Notebooks/                 # .ipynb validation + exploration
 ├── Tasks/                     # local-only todo.md, ignored
