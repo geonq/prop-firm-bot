@@ -1,4 +1,6 @@
 .env
+.env.*
+!.env.example
 venv/
 __pycache__/
 .DS_Store
@@ -8,6 +10,33 @@ __pycache__/
 .ipynb_checkpoints/
 *.egg-info/
 .pytest_cache/
+
+# Credentials / keys — never commit real secrets
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_dsa
+id_ecdsa
+id_ed25519
+*_rsa
+*_dsa
+*_ecdsa
+*_ed25519
+credentials.json
+secrets.json
+secret.json
+token.json
+auth.json
+service-account*.json
+.netrc
+.npmrc
+.pypirc
+.streamlit/secrets.toml
+*.token
+*.secret
+*.credentials
 
 # Claude-specific context files — never push to repo
 CLAUDE.md
