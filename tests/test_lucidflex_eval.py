@@ -22,11 +22,22 @@ def test_lucidflex_eod_mll_trails_and_locks() -> None:
     assert rules.update_mll_after_close(51_000, 50_100) == 50_100
 
 
-def test_consistency_allows_two_day_pass_with_cushion() -> None:
+def test_consistency_allows_exact_50_percent_split() -> None:
+    """Source doc says largest day must be <= 50% of total profit.
+
+    The previous test asserted a 52% cushion ($1,560 / $3,000) which was a
+    misread of the help-center example: that table is described as "calculated
+    on what your actual profit earned is for the day and will vary from trader
+    to trader" — a soft buffer, not a numeric threshold. Encoding strict 50%.
+    """
     rules = LucidFlex50K()
 
-    assert rules.consistency_ok([1_560, 1_440], 3_000)
-    assert not rules.consistency_ok([1_570, 1_430], 3_000)
+    # 1500/3000 = 50% — exactly at threshold, must pass (rule is "<=").
+    assert rules.consistency_ok([1_500, 1_500], 3_000)
+    # 1501/3000 = 50.03% — just over the threshold, must fail.
+    assert not rules.consistency_ok([1_501, 1_499], 3_000)
+    # Below profit target — never eligible regardless of split.
+    assert not rules.consistency_ok([1_000, 1_000], 2_000)
 
 
 def test_always_win_strategy_passes_lucidflex_eval() -> None:

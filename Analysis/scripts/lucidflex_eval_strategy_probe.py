@@ -68,7 +68,7 @@ def run_cell(win_rate: float, rr_ratio: float, loss_size: float, cost_per_trade:
 
 def main() -> None:
     print("LucidFlex 50K eval probe: synthetic ORB-like one-trade/day distributions")
-    print(f"Simulations/cell: {N_SIMS:,} | Max days: {MAX_DAYS} | Rules: EOD MLL + 52% eval consistency cushion")
+    print(f"Simulations/cell: {N_SIMS:,} | Max days: {MAX_DAYS} | Rules: EOD MLL + strict 50% eval consistency")
     print("Cost model: $5/trade placeholder. Replace after TradingView/commission model is fixed.")
     print()
 
