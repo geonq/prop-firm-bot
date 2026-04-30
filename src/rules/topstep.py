@@ -14,8 +14,10 @@ dashboard verification.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime, time
 from enum import StrEnum
+from zoneinfo import ZoneInfo
 
 
 class TopStepPayoutPath(StrEnum):
@@ -75,6 +77,14 @@ class TopStepNoFee50K:
     consistency_days_required: int = 3
     xfa_consistency_limit: float = 0.40
     profit_split: float = 0.90
+
+    # Source doc, "Trading Hours, Products, Position Rules": "flat by
+    # 3:10:00 PM CT Mon-Fri; reopen 5:00 PM CT weekdays / 5:00 PM CT Sunday".
+    # No swing trading in Combine or XFA. Holding past flatten_time = breach.
+    # Timezone America/Chicago handles CST/CDT transitions automatically.
+    timezone: ZoneInfo = field(default_factory=lambda: ZoneInfo("America/Chicago"))
+    flatten_time: time = time(15, 10)
+    reopen_time: time = time(17, 0)
 
     @property
     def combine_starting_balance(self) -> int:
@@ -206,3 +216,38 @@ class TopStepNoFee50K:
             minis = 5
 
         return minis * 10 if micros else minis
+
+    def must_be_flat(self, ts: datetime) -> bool:
+        """Return True if the firm requires positions to be flat at ``ts``.
+
+        Source doc: "Daily flatten: All positions must close before
+        3:10:00 PM CT, Monday-Friday. Reopen: 5:00 PM CT weekdays / 5:00 PM
+        CT Sunday." No swing trading in Combine or XFA.
+
+        Saturday is fully flat. Sunday is flat until 5:00 PM (reopen for the
+        Monday session). Friday is flat from 3:10 PM through the weekend.
+        Mon-Thu have a daily 3:10 PM-5:00 PM closed window.
+
+        ``ts`` must be timezone-aware. Same rationale as the LucidFlex
+        version: replaying historical trades across DST transitions makes
+        silent-naive assumptions a correctness trap.
+        """
+        if ts.tzinfo is None:
+            raise ValueError("must_be_flat requires a timezone-aware datetime")
+
+        local_ts = ts.astimezone(self.timezone)
+        weekday = local_ts.weekday()  # Monday = 0, Sunday = 6
+        local_time = local_ts.time()
+
+        if weekday == 5:  # Saturday
+            return True
+        if weekday == 6:  # Sunday
+            return local_time < self.reopen_time
+        if weekday == 4:  # Friday
+            return local_time >= self.flatten_time
+        # Monday-Thursday: daily flatten window.
+        return self.flatten_time <= local_time < self.reopen_time
+
+    def is_tradeable(self, ts: datetime) -> bool:
+        """Inverse of ``must_be_flat`` — convenience for strategy code."""
+        return not self.must_be_flat(ts)

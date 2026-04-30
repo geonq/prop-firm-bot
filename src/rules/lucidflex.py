@@ -13,7 +13,9 @@ cushion as a soft, trader-specific buffer, not a fixed numeric threshold.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime, time
+from zoneinfo import ZoneInfo
 
 
 @dataclass(frozen=True)
@@ -64,6 +66,14 @@ class LucidFlex50K:
     # audit. Treat as provisional.
     eval_fee: int = 175
     reset_cost_estimate: int = 61
+
+    # Source doc, "Trading Hours": "flat by 4:45 PM EST Mon-Fri; reopen
+    # 6:00 PM EST Sun-Thu". The firm uses "EST" colloquially — the actual
+    # timezone is America/New_York, which handles EST/EDT transitions.
+    # Holding past flatten_time = breach. Weekend hold prohibited.
+    timezone: ZoneInfo = field(default_factory=lambda: ZoneInfo("America/New_York"))
+    flatten_time: time = time(16, 45)
+    reopen_time: time = time(18, 0)
 
     @property
     def starting_balance(self) -> int:
@@ -173,3 +183,37 @@ class LucidFlex50K:
 
         # 1 mini = 10 micros at LucidFlex (consistent with TopStep's 10:1).
         return minis * 10 if micros else minis
+
+    def must_be_flat(self, ts: datetime) -> bool:
+        """Return True if the firm requires positions to be flat at ``ts``.
+
+        Source doc: "flat by 4:45 PM EST Mon-Fri; reopen 6:00 PM EST Sun-Thu".
+        Saturday is fully flat. Sunday is flat until 6:00 PM (reopen for the
+        Monday session). Friday is flat from 4:45 PM through the weekend.
+        Mon-Thu have a daily 4:45 PM-6:00 PM closed window.
+
+        ``ts`` must be timezone-aware. Naive datetimes raise ``ValueError`` —
+        silently assuming UTC or local time would be a correctness trap when
+        replaying historical trades across daylight-saving transitions.
+        """
+        if ts.tzinfo is None:
+            raise ValueError("must_be_flat requires a timezone-aware datetime")
+
+        local_ts = ts.astimezone(self.timezone)
+        weekday = local_ts.weekday()  # Monday = 0, Sunday = 6
+        local_time = local_ts.time()
+
+        if weekday == 5:  # Saturday
+            return True
+        if weekday == 6:  # Sunday
+            # Flat until reopen; at exactly reopen_time, tradeable.
+            return local_time < self.reopen_time
+        if weekday == 4:  # Friday
+            # Flat from flatten_time through the weekend (no Friday reopen).
+            return local_time >= self.flatten_time
+        # Monday-Thursday: daily flatten window.
+        return self.flatten_time <= local_time < self.reopen_time
+
+    def is_tradeable(self, ts: datetime) -> bool:
+        """Inverse of ``must_be_flat`` — convenience for strategy code."""
+        return not self.must_be_flat(ts)

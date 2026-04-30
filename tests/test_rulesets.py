@@ -5,6 +5,7 @@ Per ``Tasks/todo.md`` Phase 1 exit criteria:
 - consistency rule violation is caught
 - payout eligibility math is correct
 - ``max_contracts`` returns the documented cap for each phase
+- firm-level trading-hour rules (flatten/reopen) reject out-of-window holds
 
 These tests exercise the rule modules directly (``src/rules/lucidflex.py``
 and ``src/rules/topstep.py``) so a future encoding regression is caught
@@ -13,10 +14,17 @@ without needing a state-machine round trip.
 
 from __future__ import annotations
 
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 import pytest
 
 from src.rules.lucidflex import LucidFlex50K
 from src.rules.topstep import TopStepNoFee50K, TopStepPayoutPath
+
+
+NY = ZoneInfo("America/New_York")
+CT = ZoneInfo("America/Chicago")
 
 
 # ---------------------------------------------------------------------------
@@ -121,6 +129,67 @@ class TestLucidFlexMaxContracts:
         rules = LucidFlex50K()
         with pytest.raises(ValueError):
             rules.max_contracts(phase="invalid")
+
+
+class TestLucidFlexTradingHours:
+    """Source doc: flat by 4:45 PM EST Mon-Fri; reopen 6:00 PM EST Sun-Thu."""
+
+    def test_naive_datetime_raises(self) -> None:
+        # Replaying historical trades without timezone info is a correctness
+        # trap (DST transitions silently move boundaries). Reject explicitly.
+        rules = LucidFlex50K()
+        with pytest.raises(ValueError):
+            rules.must_be_flat(datetime(2026, 4, 30, 12, 0))
+
+    def test_midday_weekday_is_tradeable(self) -> None:
+        rules = LucidFlex50K()
+        # Wednesday noon EST — well inside open hours.
+        assert rules.is_tradeable(datetime(2026, 4, 29, 12, 0, tzinfo=NY))
+
+    def test_exactly_at_flatten_time_must_be_flat(self) -> None:
+        rules = LucidFlex50K()
+        # 4:45:00 PM Wednesday — doc says "flat BY 4:45 PM" → at the boundary
+        # itself, must be flat.
+        assert rules.must_be_flat(datetime(2026, 4, 29, 16, 45, tzinfo=NY))
+
+    def test_one_second_before_flatten_is_tradeable(self) -> None:
+        rules = LucidFlex50K()
+        assert rules.is_tradeable(datetime(2026, 4, 29, 16, 44, 59, tzinfo=NY))
+
+    def test_exactly_at_reopen_is_tradeable(self) -> None:
+        rules = LucidFlex50K()
+        # 6:00:00 PM Wednesday — at reopen, tradeable again.
+        assert rules.is_tradeable(datetime(2026, 4, 29, 18, 0, tzinfo=NY))
+
+    def test_one_second_before_reopen_must_be_flat(self) -> None:
+        rules = LucidFlex50K()
+        assert rules.must_be_flat(datetime(2026, 4, 29, 17, 59, 59, tzinfo=NY))
+
+    def test_friday_after_flatten_must_be_flat(self) -> None:
+        rules = LucidFlex50K()
+        # Friday 5 PM — Friday close stays in effect through the weekend.
+        assert rules.must_be_flat(datetime(2026, 5, 1, 17, 0, tzinfo=NY))
+
+    def test_saturday_always_flat(self) -> None:
+        rules = LucidFlex50K()
+        # Saturday at any time — firm closed.
+        assert rules.must_be_flat(datetime(2026, 5, 2, 12, 0, tzinfo=NY))
+
+    def test_sunday_before_reopen_must_be_flat(self) -> None:
+        rules = LucidFlex50K()
+        assert rules.must_be_flat(datetime(2026, 5, 3, 17, 0, tzinfo=NY))
+
+    def test_sunday_at_reopen_is_tradeable(self) -> None:
+        rules = LucidFlex50K()
+        # Sunday 6:00 PM EST — reopen for Monday's session.
+        assert rules.is_tradeable(datetime(2026, 5, 3, 18, 0, tzinfo=NY))
+
+    def test_utc_input_converted_correctly(self) -> None:
+        rules = LucidFlex50K()
+        # 8:00 PM UTC = 4:00 PM EDT (April 29, 2026, DST in effect).
+        # 4:00 PM EDT is before 4:45 PM flatten → tradeable.
+        ts_utc = datetime(2026, 4, 29, 20, 0, tzinfo=ZoneInfo("UTC"))
+        assert rules.is_tradeable(ts_utc)
 
 
 # ---------------------------------------------------------------------------
@@ -233,3 +302,49 @@ class TestTopStepMaxContracts:
         rules = TopStepNoFee50K()
         with pytest.raises(ValueError):
             rules.max_contracts(phase="invalid")
+
+
+class TestTopStepTradingHours:
+    """Source doc: flat by 3:10 PM CT Mon-Fri; reopen 5:00 PM CT."""
+
+    def test_naive_datetime_raises(self) -> None:
+        rules = TopStepNoFee50K()
+        with pytest.raises(ValueError):
+            rules.must_be_flat(datetime(2026, 4, 30, 12, 0))
+
+    def test_midday_weekday_is_tradeable(self) -> None:
+        rules = TopStepNoFee50K()
+        # Wednesday 10 AM CT — well inside open hours.
+        assert rules.is_tradeable(datetime(2026, 4, 29, 10, 0, tzinfo=CT))
+
+    def test_exactly_at_flatten_time_must_be_flat(self) -> None:
+        rules = TopStepNoFee50K()
+        # 3:10:00 PM Wednesday — boundary itself must be flat.
+        assert rules.must_be_flat(datetime(2026, 4, 29, 15, 10, tzinfo=CT))
+
+    def test_one_second_before_flatten_is_tradeable(self) -> None:
+        rules = TopStepNoFee50K()
+        assert rules.is_tradeable(datetime(2026, 4, 29, 15, 9, 59, tzinfo=CT))
+
+    def test_exactly_at_reopen_is_tradeable(self) -> None:
+        rules = TopStepNoFee50K()
+        # 5:00:00 PM Wednesday — at reopen, tradeable.
+        assert rules.is_tradeable(datetime(2026, 4, 29, 17, 0, tzinfo=CT))
+
+    def test_friday_after_flatten_must_be_flat(self) -> None:
+        rules = TopStepNoFee50K()
+        # Friday 4 PM CT — Friday close runs through weekend.
+        assert rules.must_be_flat(datetime(2026, 5, 1, 16, 0, tzinfo=CT))
+
+    def test_saturday_always_flat(self) -> None:
+        rules = TopStepNoFee50K()
+        assert rules.must_be_flat(datetime(2026, 5, 2, 12, 0, tzinfo=CT))
+
+    def test_sunday_at_reopen_is_tradeable(self) -> None:
+        rules = TopStepNoFee50K()
+        # Sunday 5:00 PM CT — reopen for Monday's session.
+        assert rules.is_tradeable(datetime(2026, 5, 3, 17, 0, tzinfo=CT))
+
+    def test_sunday_before_reopen_must_be_flat(self) -> None:
+        rules = TopStepNoFee50K()
+        assert rules.must_be_flat(datetime(2026, 5, 3, 16, 59, tzinfo=CT))
