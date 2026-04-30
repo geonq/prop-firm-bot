@@ -13,9 +13,8 @@ from dataclasses import dataclass
 class LucidFlex50K:
     """LucidFlex 50K rule parameters used by the simulator.
 
-    This first encoding focuses on the evaluation phase because that is the
-    gating step for the initial strategy probe. Funded payout rules are kept as
-    constants here but are not simulated yet.
+    This first encoding covers the 50K evaluation values plus the funded payout
+    constants needed by the initial LucidFlex account-state tests.
     """
 
     account_size: int = 50_000
@@ -31,6 +30,7 @@ class LucidFlex50K:
     payout_maximum: int = 2_000
     payout_min_profitable_days: int = 5
     payout_min_daily_profit: int = 150
+    max_simulated_payouts: int = 5
     eval_fee: int = 175
     reset_cost_estimate: int = 61
 
@@ -63,6 +63,23 @@ class LucidFlex50K:
 
         largest_day = max(daily_pnls, default=0.0)
         return largest_day / total_profit <= self.eval_consistency_limit
+
+    def payout_request_amount(self, simulated_profit: float) -> float:
+        """Return gross payout request amount before the 90/10 split.
+
+        LucidFlex 50K max request is 50% of profit, capped at $2,000. This
+        method returns zero when the minimum request is not met.
+        """
+        if simulated_profit <= 0:
+            return 0.0
+
+        request = min(simulated_profit * 0.50, self.payout_maximum)
+        if request < self.payout_minimum:
+            return 0.0
+        return float(request)
+
+    def trader_payout_amount(self, gross_request: float) -> float:
+        return gross_request * self.funded_profit_split
 
     def max_contracts(self, *, micros: bool = False, phase: str = "eval", simulated_profit: float = 0.0) -> int:
         """Return the max allowed contracts for 50K.
