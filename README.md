@@ -55,3 +55,8 @@ Prop Firm Bot/
 - `Analysis/2026-04-30_lucidflex_full_pipeline_probe_orb_proxy.md` — first synthetic ORB-like distribution probe through LucidFlex eval and funded payouts.
 
 The ORB/TORB work is a falsification baseline, not an endorsed profitable strategy. Current evidence says low-risk ORB-like profiles timeout and higher-risk profiles breach often.
+
+## Current state machines
+
+- `src/pipeline/lucidflex_account.py` — canonical LucidFlex 50K account state machine for eval, funded payouts, breach, and eval reset.
+- `src/pipeline/topstep_account.py` — canonical TopStep 50K No Activation Fee account state machine for Combine, XFA Standard/Consistency payout paths, optional DLL lock, Combine reset, and Back2Funded.
