@@ -29,6 +29,8 @@ Prop Firm Bot/
 │   └── TopStep/
 ├── Sources/                   # verbatim primary-source documents (e.g. founding-thesis transcript)
 ├── Analysis/                  # research notes, sanity checks, literature reviews
+│   ├── scripts/               # standalone research/probe scripts
+│   └── strategy_specs/        # implementation contracts for candidate strategies
 ├── Coordination/              # tracked Codex/Claude handoff + changelog
 ├── Notebooks/                 # .ipynb validation + exploration
 ├── Tasks/                     # local-only todo.md, ignored
@@ -44,3 +46,11 @@ Prop Firm Bot/
 │   └── data/                  # TV export loader
 └── tests/
 ```
+
+## Current research artifacts
+
+- `Analysis/2026-04-30_strategy_shortlist_nq_prop_firm.md` — ranked NQ/MNQ strategy candidates for the prop-firm payoff model.
+- `Analysis/strategy_specs/torb_orb_v0.md` — exact v0 timely opening range breakout baseline spec.
+- `Analysis/2026-04-30_lucidflex_eval_probe_orb_proxy.md` — first synthetic ORB-like distribution probe against LucidFlex 50K evaluation rules.
+
+The ORB/TORB work is a falsification baseline, not an endorsed profitable strategy. Current evidence says low-risk ORB-like profiles timeout and higher-risk profiles breach often.
