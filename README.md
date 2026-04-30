@@ -61,4 +61,6 @@ The ORB/TORB work is a falsification baseline, not an endorsed profitable strate
 ## Current state machines
 
 - `src/pipeline/lucidflex_account.py` — canonical LucidFlex 50K account state machine for eval, funded payouts, breach, and eval reset.
+- `src/pipeline/lucidflex_replay.py` — deterministic LucidFlex replay path for dated trade R-multiple days, including no-trade days.
+- `src/data/replay_loader.py` — CSV loader for replay-day inputs using `session_date,r_multiple`.
 - `src/pipeline/topstep_account.py` — canonical TopStep 50K No Activation Fee account state machine for Combine, XFA Standard/Consistency payout paths, optional DLL lock, Combine reset, and Back2Funded.
