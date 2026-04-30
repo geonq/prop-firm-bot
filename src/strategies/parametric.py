@@ -45,3 +45,61 @@ class BernoulliTradeStrategy:
     def sample_trade(self, rng: random.Random) -> float:
         gross_pnl = self.win_size if rng.random() < self.win_rate else -self.loss_size
         return gross_pnl - self.cost_per_trade
+
+
+@dataclass(frozen=True)
+class PhaseAwareBernoulliStrategy:
+    """Bernoulli generator with separate eval and funded risk.
+
+    Win-rate and R:R are kept constant so this isolates the effect of sizing
+    across account phases.
+    """
+
+    win_rate: float
+    rr_ratio: float
+    eval_loss_size: float
+    funded_loss_size: float
+    trades_per_day: int = 1
+    eval_cost_per_trade: float = 0.0
+    funded_cost_per_trade: float = 0.0
+
+    def __post_init__(self) -> None:
+        if not 0 <= self.win_rate <= 1:
+            raise ValueError("win_rate must be in [0, 1]")
+        if self.rr_ratio <= 0:
+            raise ValueError("rr_ratio must be positive")
+        if self.eval_loss_size <= 0:
+            raise ValueError("eval_loss_size must be positive")
+        if self.funded_loss_size <= 0:
+            raise ValueError("funded_loss_size must be positive")
+        if self.trades_per_day <= 0:
+            raise ValueError("trades_per_day must be positive")
+        if self.eval_cost_per_trade < 0 or self.funded_cost_per_trade < 0:
+            raise ValueError("costs must be non-negative")
+
+    def loss_size(self, phase: str) -> float:
+        if phase == "eval":
+            return self.eval_loss_size
+        if phase == "funded":
+            return self.funded_loss_size
+        msg = f"unknown phase: {phase}"
+        raise ValueError(msg)
+
+    def cost_per_trade(self, phase: str) -> float:
+        if phase == "eval":
+            return self.eval_cost_per_trade
+        if phase == "funded":
+            return self.funded_cost_per_trade
+        msg = f"unknown phase: {phase}"
+        raise ValueError(msg)
+
+    def expected_value_per_trade(self, phase: str) -> float:
+        loss_size = self.loss_size(phase)
+        gross = self.win_rate * self.rr_ratio * loss_size - (1 - self.win_rate) * loss_size
+        return gross - self.cost_per_trade(phase)
+
+    def sample_trade(self, rng: random.Random, *, phase: str) -> float:
+        loss_size = self.loss_size(phase)
+        win_size = self.rr_ratio * loss_size
+        gross_pnl = win_size if rng.random() < self.win_rate else -loss_size
+        return gross_pnl - self.cost_per_trade(phase)

@@ -1,5 +1,5 @@
 from src.pipeline.lucidflex_pipeline import simulate_lucidflex_pipeline
-from src.strategies.parametric import BernoulliTradeStrategy
+from src.strategies.parametric import BernoulliTradeStrategy, PhaseAwareBernoulliStrategy
 
 
 def test_pipeline_losing_strategy_loses_eval_fee_only() -> None:
@@ -36,3 +36,21 @@ def test_pipeline_funded_timeout_keeps_collected_payouts() -> None:
     assert result.payout_count == 1
     assert result.trader_payouts == 1_687.5
     assert result.net_ev == 1_512.5
+
+
+def test_pipeline_phase_aware_strategy_uses_lower_funded_risk() -> None:
+    strategy = PhaseAwareBernoulliStrategy(
+        win_rate=1.0,
+        rr_ratio=1.0,
+        eval_loss_size=750,
+        funded_loss_size=200,
+        trades_per_day=1,
+    )
+
+    result = simulate_lucidflex_pipeline(strategy, seed=1, max_eval_days=10, max_funded_days=15)
+
+    assert result.terminal_reason == "funded_timeout"
+    assert result.eval_days == 4
+    assert result.payout_count == 3
+    assert result.trader_payouts == 1_912.5
+    assert result.ending_funded_balance == 50_875
