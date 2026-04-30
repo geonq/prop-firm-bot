@@ -1,8 +1,8 @@
 # LucidFlex — Encoding Reference
 
 > **Last updated:** 2026-04-30
-> **Sources:** Original LucidFlex help-center paste (rule structure) + 2026-04-30 additions from third-party reviews (Lucid's own help URLs returned 403 to WebFetch — flagged `[VERIFY]` for Reviewer pass against the live dashboard).
-> **Status for Phase 1 encoding:** substantially complete. Reviewer must confirm `[VERIFY]` items before sign-off.
+> **Sources:** Original LucidFlex help-center paste (rule structure) + 2026-04-30 official Lucid help-center verification for evaluation/funded parameters, payouts, drawdown, scaling, approved products, permitted activities, and allowed trading times.
+> **Status for Phase 1 encoding:** core rule mechanics are substantially complete for 50K encoding. Reviewer must still confirm dashboard-only commercial fields tagged `[VERIFY]`.
 
 ---
 
@@ -38,9 +38,9 @@ Actual price shown in Lucid dashboard at purchase time is authoritative.
 
 ---
 
-## Approved Products `[VERIFY]`
+## Approved Products
 
-Third-party-sourced; claimed "36 contracts" but explicit listing totals ~33. Reviewer to confirm against Lucid's official approved-products article.
+Official Lucid help-center source. NQ/MNQ are Phase 1 priority.
 
 ### Equity Index Futures
 
@@ -63,13 +63,13 @@ Third-party-sourced; claimed "36 contracts" but explicit listing totals ~33. Rev
 CL ($2.00), MCL ($0.50), QM ($2.00), NG ($2.00), QG ($1.30)
 
 ### Metals
-GC ($2.30), MGC ($0.80), SI ($2.30), PL ($2.30), HG ($2.30). **Palladium (PD) NOT permitted.**
+GC ($2.30), MGC ($0.80), SI ($2.30), SIL ($1.60), PL ($2.30), HG ($2.30). **Palladium (PD) NOT in the approved list.**
 
 ### Agricultural (all $2.80/side)
 ZS, ZC, ZW, ZL, ZM, LE, HE
 
 ### Explicitly excluded
-Treasury futures (ZN, ZB, ZF, ZT, TN, UB), Bitcoin (BTC, MBT), VIX, soft commodities (cotton/cocoa/coffee/sugar), Palladium (PD), micro forex contracts.
+Not present in the official approved-products list: Treasury futures (ZN, ZB, ZF, ZT, TN, UB), Bitcoin (BTC, MBT), VIX, soft commodities (cotton/cocoa/coffee/sugar), Palladium (PD), micro forex contracts.
 
 ### Project relevance
 ES, NQ, MES, MNQ all permitted — Phase 4 Pine Script strategies on NQ have no product conflict.
@@ -99,7 +99,6 @@ The News Trading section of the original paste mentions "velocity logic triggers
 
 - [ ] Eval prices (50K = $175 specifically; check 100K/150K both at $345)
 - [ ] Reset cost for 50K (~$61) — pull exact from Lucid dashboard
-- [ ] Approved products full list — cross-check against Lucid's official article
 - [ ] "Velocity logic" definition
 
 ---

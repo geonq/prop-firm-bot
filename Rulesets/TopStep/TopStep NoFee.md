@@ -1,8 +1,8 @@
 # TopStep — Encoding Reference
 
 > **Last updated:** 2026-04-30
-> **Sources:** Original TopStep "No Activation Fee" paste (rule structure) + 2026-04-30 additions from official help-center articles where reachable, third-party reviews where not. Items tagged `[VERIFY]` should be confirmed against TopStep's live dashboard during the Phase 1 Reviewer pass.
-> **Status for Phase 1 encoding:** substantially complete.
+> **Sources:** Original TopStep "No Activation Fee" paste (rule structure) + 2026-04-30 official help-center verification for pricing, MLL, DLL, Trading Combine parameters, XFA parameters, payout policy, trading hours/products, and Back2Funded. Items tagged `[VERIFY]` should be confirmed against TopStep's live dashboard during the Phase 1 Reviewer pass.
+> **Status for Phase 1 encoding:** substantially complete for 50K encoding, with scaling-plan numeric graph values still requiring dashboard/image verification.
 
 ---
 
@@ -12,28 +12,28 @@
 
 | Account | Standard Path | No Activation Fee Path |
 |---------|---------------|------------------------|
-| 50K | $49/mo | **$109/mo** |
-| 100K | (verify) | (verify) |
-| 150K | (verify) | (verify) |
+| 50K | $49/mo | **$95/mo** |
+| 100K | $99/mo | $149/mo |
+| 150K | $149/mo | $229/mo |
 
-> TopStep introduced lower pricing on the NoFee path on **2026-04-28** (two days before this doc). Verify $109 is current.
+> TopStep introduced lower No Activation Fee pricing on **2026-04-28**. These are the current official post-change prices for new purchases.
 
 ### Activation fee (one-time, paid when XFA activates)
 
 | Path | Activation Fee |
 |------|----------------|
-| Standard | $129 (was $149 — verify current) |
+| Standard | $149 |
 | **No Activation Fee** | **$0** |
 
 The NoFee path is the project default unless explicitly comparing both.
 
-### Trading Combine reset (manual purchase) `[VERIFY]`
+### Trading Combine reset (manual purchase)
 
-| Account | Reset |
-|---------|-------|
-| 50K | $49 |
-| 100K | $99 |
-| 150K | $149 |
+| Account | Standard Path Reset | No Activation Fee Path Reset |
+|---------|---------------------|------------------------------|
+| 50K | $49 | $109 |
+| 100K | $99 | $159 |
+| 150K | $149 | $209 |
 
 Each subscription rebill also adds one Reset Credit automatically.
 
@@ -77,15 +77,15 @@ After taking a payout in XFA, **MLL resets to $0** and a fresh winning-day cycle
 
 ---
 
-## Daily Loss Limit (DLL) — XFA only, NOT in Trading Combine `[VERIFY]`
+## Daily Loss Limit (DLL) — optional in Trading Combine/XFA, automatic in Live
 
-| Account | DLL (XFA) |
-|---------|-----------|
+| Account | DLL |
+|---------|-----|
 | 50K | **$1,000** |
 | 100K | $2,000 |
 | 150K | $3,000 |
 
-**Behavior:** intraday running net P&L. Hitting DLL **deactivates the account for that day only — does NOT permanently close it.** Account becomes available again next session start (5:00 PM CT next weekday). Materially different from MLL.
+**Behavior:** intraday running net P&L. In Trading Combine or XFA, DLL can be selected permanently at checkout or configured manually in TopstepX risk settings. Hitting DLL **auto-liquidates/blocks trading for that session only — it is not a rule violation and does not permanently close the account.** Account becomes available again next session start (5:00 PM CT next weekday). Live Funded Accounts have DLL automatically. Materially different from MLL.
 
 ---
 
@@ -206,14 +206,8 @@ NQ + MNQ are Phase 1 priority.
 
 ## Verification checklist for Phase 1 Reviewer pass
 
-- [ ] DLL dollar amounts ($1,000 / $2,000 / $3,000) — official article URL returned 404 to WebFetch
-- [ ] Trading Combine reset costs ($49 / $99 / $149)
-- [ ] Standard Activation Fee — $129 (post-2026-04-28) or still $149?
-- [ ] NoFee subscription $109/mo — confirm post-2026-04-28
-- [ ] 100K and 150K subscription costs (not pulled)
 - [ ] Scaling Plan numbers — third-party sourced, verify in dashboard
 - [ ] 100K scaling cap — 10 not 15 (third-party error)
-- [ ] DLL behavior post-payout (does it persist or reset?)
 - [ ] News-trading specific restrictions in TopStep "Prohibited Conduct"
 
 ---
@@ -5130,4 +5124,3 @@ _**Additional features not listed may require a paid platform license. Additiona
 ## Quantower Platform Support
 
 [Quantower support can be contacted here](https://www.quantower.com/contact-us) through an online form. Additional information can be found through the [online guide.](https://help.quantower.com/quantower/)
-
