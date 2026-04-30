@@ -5,9 +5,12 @@ Monte Carlo engine that models prop firm accounts as structured products and fin
 ## Read first
 
 - `PROJECT_CONTEXT.md` — why every architectural decision was made
-- `Tasks/todo.md` — phased build plan with exit criteria
-- `CLAUDE.md` (symlink to global) — workflow rules
-- `REFERENCE.md` (symlink to global) — technical patterns
+- `AGENTS.md` — shared rules for Codex, Claude Code, and future agents
+- `Coordination/HANDOFF.md` — current state, next action, and active constraints
+- `Coordination/CHANGELOG.md` — shared agent changelog
+- `Coordination/DECISIONS.md` — settled decisions
+
+Local-only files such as `Tasks/todo.md`, `CLAUDE.md`, and `REFERENCE.md` may exist on Georg's machine, but they are intentionally ignored and are not required for GitHub collaboration.
 
 ## Scope
 
@@ -24,8 +27,9 @@ Prop Firm Bot/
 ├── Rulesets/                  # rule documents pulled from official sources
 │   ├── LucidFlex/
 │   └── TopStep/
+├── Coordination/              # tracked Codex/Claude handoff + changelog
 ├── Notebooks/                 # .ipynb validation + exploration
-├── Tasks/                     # todo.md
+├── Tasks/                     # local-only todo.md, ignored
 ├── Dashboard/                 # streamlit app
 ├── PineScripts/               # TradingView Pine source
 ├── TVExports/                 # XLSX strategy tester exports (gitignored)
