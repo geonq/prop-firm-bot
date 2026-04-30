@@ -1,3 +1,111 @@
+# LucidFlex — Encoding Reference
+
+> **Last updated:** 2026-04-30
+> **Sources:** Original LucidFlex help-center paste (rule structure) + 2026-04-30 additions from third-party reviews (Lucid's own help URLs returned 403 to WebFetch — flagged `[VERIFY]` for Reviewer pass against the live dashboard).
+> **Status for Phase 1 encoding:** substantially complete. Reviewer must confirm `[VERIFY]` items before sign-off.
+
+---
+
+## Pricing
+
+### Eval purchase price `[VERIFY]`
+
+| Account | Eval Price |
+|---------|-----------|
+| 25K | $75 |
+| 50K | **$175** |
+| 100K | $345 |
+| 150K | $345 |
+
+> 100K and 150K both at $345 is suspicious — possible source typo. Reviewer to confirm against Lucid dashboard.
+
+### Reset cost `[VERIFY]`
+
+Approximately 30–40% of original eval price (third-party source).
+
+| Account | Estimated Reset |
+|---------|-----------------|
+| 25K | ~$26 |
+| 50K | **~$61** |
+| 100K | ~$121 |
+| 150K | ~$121 |
+
+Actual price shown in Lucid dashboard at purchase time is authoritative.
+
+### Activation fee
+
+**None.** No fee to upgrade from LucidFlex Evaluation to LucidFlex Funded. Eval price + optional resets is the entire upfront cost path to a funded account.
+
+---
+
+## Approved Products `[VERIFY]`
+
+Third-party-sourced; claimed "36 contracts" but explicit listing totals ~33. Reviewer to confirm against Lucid's official approved-products article.
+
+### Equity Index Futures
+
+| Code | Name | Commission/side |
+|------|------|-----------------|
+| ES | E-mini S&P 500 | $1.75 |
+| NQ | E-mini Nasdaq-100 | $1.75 |
+| RTY | E-mini Russell 2000 | $1.75 |
+| YM | E-mini Dow Jones | $1.75 |
+| MES | Micro S&P 500 | $0.50 |
+| MNQ | Micro Nasdaq-100 | $0.50 |
+| M2K | Micro Russell 2000 | $0.50 |
+| MYM | Micro Dow Jones | $0.50 |
+| NKD | Nikkei 225/USD | $1.75 |
+
+### Forex (all $2.40/side)
+6A, 6B, 6C, 6E, 6J, 6S, 6N. **Micro forex contracts NOT permitted** at Lucid (despite CME availability).
+
+### Energy
+CL ($2.00), MCL ($0.50), QM ($2.00), NG ($2.00), QG ($1.30)
+
+### Metals
+GC ($2.30), MGC ($0.80), SI ($2.30), PL ($2.30), HG ($2.30). **Palladium (PD) NOT permitted.**
+
+### Agricultural (all $2.80/side)
+ZS, ZC, ZW, ZL, ZM, LE, HE
+
+### Explicitly excluded
+Treasury futures (ZN, ZB, ZF, ZT, TN, UB), Bitcoin (BTC, MBT), VIX, soft commodities (cotton/cocoa/coffee/sugar), Palladium (PD), micro forex contracts.
+
+### Project relevance
+ES, NQ, MES, MNQ all permitted — Phase 4 Pine Script strategies on NQ have no product conflict.
+
+---
+
+## Tick values (CME standard, firm-agnostic)
+
+| Contract | Tick size | Tick value | Point value |
+|----------|-----------|------------|-------------|
+| NQ | 0.25 | $5.00 | $20 |
+| MNQ | 0.25 | $0.50 | $2 |
+| ES | 0.25 | $12.50 | $50 |
+| MES | 0.25 | $1.25 | $5 |
+
+NQ + MNQ are Phase 1 priority.
+
+---
+
+## Open question — "velocity logic"
+
+The News Trading section of the original paste mentions "velocity logic triggers" without defining the mechanism. Could affect slippage modeling in Phase 3. Reviewer to dig up Lucid's definition during Phase 1.
+
+---
+
+## Verification checklist for Phase 1 Reviewer pass
+
+- [ ] Eval prices (50K = $175 specifically; check 100K/150K both at $345)
+- [ ] Reset cost for 50K (~$61) — pull exact from Lucid dashboard
+- [ ] Approved products full list — cross-check against Lucid's official article
+- [ ] "Velocity logic" definition
+
+---
+
+# 📄 Below: Original LucidFlex help-center paste (rule structure — verbatim)
+
 
 # Simulated Account Fees
 

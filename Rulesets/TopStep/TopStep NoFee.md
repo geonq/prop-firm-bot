@@ -1,3 +1,226 @@
+# TopStep — Encoding Reference
+
+> **Last updated:** 2026-04-30
+> **Sources:** Original TopStep "No Activation Fee" paste (rule structure) + 2026-04-30 additions from official help-center articles where reachable, third-party reviews where not. Items tagged `[VERIFY]` should be confirmed against TopStep's live dashboard during the Phase 1 Reviewer pass.
+> **Status for Phase 1 encoding:** substantially complete.
+
+---
+
+## Pricing
+
+### Trading Combine subscription (recurring monthly)
+
+| Account | Standard Path | No Activation Fee Path |
+|---------|---------------|------------------------|
+| 50K | $49/mo | **$109/mo** |
+| 100K | (verify) | (verify) |
+| 150K | (verify) | (verify) |
+
+> TopStep introduced lower pricing on the NoFee path on **2026-04-28** (two days before this doc). Verify $109 is current.
+
+### Activation fee (one-time, paid when XFA activates)
+
+| Path | Activation Fee |
+|------|----------------|
+| Standard | $129 (was $149 — verify current) |
+| **No Activation Fee** | **$0** |
+
+The NoFee path is the project default unless explicitly comparing both.
+
+### Trading Combine reset (manual purchase) `[VERIFY]`
+
+| Account | Reset |
+|---------|-------|
+| 50K | $49 |
+| 100K | $99 |
+| 150K | $149 |
+
+Each subscription rebill also adds one Reset Credit automatically.
+
+### Back2Funded reactivation (XFA — pre-first-payout only, max 2 per XFA)
+
+| Account | Cost |
+|---------|------|
+| 50K | **$599** |
+| 100K | $699 |
+| 150K | $829 |
+
+---
+
+## Maximum Loss Limit (MLL) — the breach rule
+
+### Dollar amounts (from official help center)
+
+| Account | MLL |
+|---------|-----|
+| 50K | **$2,000** |
+| 100K | $3,000 |
+| 150K | $4,500 |
+
+### Trailing mechanism
+
+Trails the **highest end-of-day balance**, never moves down. Updates at end-of-day; monitored real-time during the day (intraday breach below MLL = immediate liquidation).
+
+**Trading Combine (50K example):** starts at $50,000, MLL begins at $48,000. Day 1: +$500 → balance $50,500, MLL trails to $48,500. Day 2: −$500 → balance $50,000, MLL stays at $48,500 (never moves down). **Once MLL trails up to the original starting balance ($50,000 for 50K), it locks there permanently.**
+
+**XFA (50K example):** starts $0 displayed balance, MLL at −$2,000. After +$1,000: balance $1,000, MLL trails to −$1,000. After another +$1,000: balance $2,000, **MLL locks at $0 permanently.**
+
+After taking a payout in XFA, **MLL resets to $0** and a fresh winning-day cycle begins.
+
+### Hitting MLL — consequences
+
+| Phase | Consequence |
+|-------|-------------|
+| Trading Combine | Liquidated for the day; ineligible for funding until reset |
+| XFA | Permanently closed (Back2Funded available if no payout taken) |
+| Live | Closed at end of day |
+
+---
+
+## Daily Loss Limit (DLL) — XFA only, NOT in Trading Combine `[VERIFY]`
+
+| Account | DLL (XFA) |
+|---------|-----------|
+| 50K | **$1,000** |
+| 100K | $2,000 |
+| 150K | $3,000 |
+
+**Behavior:** intraday running net P&L. Hitting DLL **deactivates the account for that day only — does NOT permanently close it.** Account becomes available again next session start (5:00 PM CT next weekday). Materially different from MLL.
+
+---
+
+## Scaling Plan (XFA only — replaces Trading Combine's Maximum Position Size) `[VERIFY]`
+
+Numbers below are third-party-sourced (TopStep's official scaling plan article shows graphs as images only). Reviewer to confirm against dashboard.
+
+### 50K XFA
+
+| End-of-Day Balance | Max Contracts |
+|---------------------|---------------|
+| Below $1,500 | 2 lots |
+| $1,500 – $2,000 | 3 lots |
+| Above $2,000 | 5 lots (cap) |
+
+### 100K XFA
+
+| End-of-Day Balance | Max Contracts |
+|---------------------|---------------|
+| Below $1,500 | 3 |
+| $1,500 – $2,000 | 4 |
+| $2,000 – $3,000 | 5 |
+| $3,000 – $4,500 | 10 (cap, per Combine max) |
+| Above $4,500 | 10 |
+
+> Third-party listed "Above $4,500 → 15" for 100K but that contradicts the Combine cap of 10 — treat as 10. Reviewer to verify.
+
+### 150K XFA
+
+| End-of-Day Balance | Max Contracts |
+|---------------------|---------------|
+| Below $1,500 | 3 |
+| $1,500 – $2,000 | 4 |
+| $2,000 – $3,000 | 5 |
+| $3,000 – $4,500 | 10 |
+| Above $4,500 | 15 (cap) |
+
+### Rules
+- Updates at end-of-day. Mid-session profit doesn't unlock contracts that day.
+- Errors corrected within 10 seconds are ignored.
+- TopstepX: 1 mini = 10 micros (10:1). Third-party platforms: 1 micro = 1 lot.
+- Special: Micro Silver = 5:1 vs Silver. Micro Bitcoin (MBT) and Micro Ether (MET) capped at mini-equivalent sizing, not micro scaling.
+
+### Trading Combine Maximum Position Size (flat ceiling — no scaling)
+
+| Combine | Max |
+|---------|-----|
+| 50K | 5 minis or 50 micros |
+| 100K | 10 minis or 100 micros |
+| 150K | 15 minis or 150 micros |
+
+---
+
+## Trading Hours, Products, Position Rules
+
+- **Trading day:** 5:00 PM CT through 3:10 PM CT next calendar day. Trades after 5:00 PM CT count toward NEXT day's activity.
+- **Daily flatten:** All positions must close before **3:10:00 PM CT, Monday–Friday.**
+- **Reopen:** 5:00 PM CT weekdays / 5:00 PM CT Sunday.
+- **Friday close:** 3:10 PM CT.
+- **No swing trading in XFA or Trading Combine** — positions cannot carry overnight.
+- **Price limit rule:** cannot trade within 2% of CME Price Limit (overnight equity Price Limits = 7%, daytime = 5%).
+
+### Permitted products (full list, official help center)
+
+- **CME Equity:** ES, MES, NQ, MNQ, RTY, M2K, YM, MYM, NKD, MBT, MET
+- **Forex:** 6A, 6B, 6C, 6E, 6J, 6S, E7, M6E, M6A, 6M, 6N, M6B
+- **Agricultural:** HE, LE, ZC, ZW, ZS, ZM, ZL
+- **Energy & Metals:** CL, QM, NG, QG, MCL, RB, HO, PL, MNG, GC, SI, HG, MGC, SIL, MHG
+- **Interest Rates:** ZT, ZF, ZN, TN, ZB, UB
+
+NQ + MNQ permitted — Phase 4 Pine Scripts have no conflict.
+
+---
+
+## Payout Policy
+
+### Two paths (chosen at XFA activation, locked per account)
+
+| | Standard | Consistency |
+|---|---|---|
+| Eligibility window | 5 winning days (Net P&L ≥ $150 each, non-consecutive) | 3 trading days, largest day ≤ 40% of total profit |
+| 50K cap per request | **$2,000** | $3,000 |
+| 100K cap | $3,000 | $4,000 |
+| 150K cap | $5,000 | $6,000 |
+| Split | 90/10 | 90/10 |
+
+> **Correction to original paste:** the table at line 425 of the original paste shows "$5000* / $6,000*" — those are the **150K row**, not 50K. The asterisk note in that table clarifies caps are per-account-size; for 50K specifically they're $2,000 (Standard) and $3,000 (Consistency).
+
+### Per-request mechanics
+- **Min payout request:** $125
+- Each request capped at 50% of account balance, subject to per-size caps above
+- After payout: MLL set to $0, fresh cycle begins (5 new winning days for Standard / 3 new days at 40% for Consistency)
+
+### Request hours
+- Sun 5:00 PM CT – Fri 5:00 PM CT (CME hours, excluding holidays)
+- Approval: 1–3 business days; funds: within 10 business days
+- $30 processing fee on ACH and Wire payouts
+
+---
+
+## Tick values (CME standard)
+
+| Contract | Tick size | Tick value | Point value |
+|----------|-----------|------------|-------------|
+| NQ | 0.25 | $5.00 | $20 |
+| MNQ | 0.25 | $0.50 | $2 |
+| ES | 0.25 | $12.50 | $50 |
+| MES | 0.25 | $1.25 | $5 |
+| YM | 1.0 | $5.00 | $5 |
+| GC | 0.10 | $10.00 | $100 |
+| MGC | 0.10 | $1.00 | $10 |
+| CL | 0.01 | $10.00 | $1,000 |
+| MCL | 0.01 | $1.00 | $100 |
+
+NQ + MNQ are Phase 1 priority.
+
+---
+
+## Verification checklist for Phase 1 Reviewer pass
+
+- [ ] DLL dollar amounts ($1,000 / $2,000 / $3,000) — official article URL returned 404 to WebFetch
+- [ ] Trading Combine reset costs ($49 / $99 / $149)
+- [ ] Standard Activation Fee — $129 (post-2026-04-28) or still $149?
+- [ ] NoFee subscription $109/mo — confirm post-2026-04-28
+- [ ] 100K and 150K subscription costs (not pulled)
+- [ ] Scaling Plan numbers — third-party sourced, verify in dashboard
+- [ ] 100K scaling cap — 10 not 15 (third-party error)
+- [ ] DLL behavior post-payout (does it persist or reset?)
+- [ ] News-trading specific restrictions in TopStep "Prohibited Conduct"
+
+---
+
+# 📄 Below: Original TopStep "No Activation Fee" paste (rule structure — verbatim)
+
+
 # Level 1 & Level 2 Market Data
 ## What is the difference between Level 1 (Top of Book) Data and Level 2 (Depth of Market) Data?
 
