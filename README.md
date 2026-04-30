@@ -54,6 +54,7 @@ Prop Firm Bot/
 - `Analysis/2026-04-30_lucidflex_eval_probe_orb_proxy.md` — first synthetic ORB-like distribution probe against LucidFlex 50K evaluation rules.
 - `Analysis/2026-04-30_lucidflex_full_pipeline_probe_orb_proxy.md` — first synthetic ORB-like distribution probe through LucidFlex eval and funded payouts.
 - `Analysis/2026-04-30_lucidflex_phase_sizing_probe.md` — first synthetic phase-aware sizing probe using different eval/funded risk.
+- `Analysis/2026-04-30_lucidflex_phase_risk_grid.md` — first synthetic grid search over LucidFlex eval risk and funded risk.
 
 The ORB/TORB work is a falsification baseline, not an endorsed profitable strategy. Current evidence says low-risk ORB-like profiles timeout and higher-risk profiles breach often.
 
