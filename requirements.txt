@@ -6,3 +6,5 @@ plotly
 pytest
 jupyter
 openpyxl
+databento
+python-dotenv

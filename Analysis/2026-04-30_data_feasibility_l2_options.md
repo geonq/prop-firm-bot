@@ -12,26 +12,31 @@ scope: NQ/MNQ L2, NDX/QQQ options flow, IV/RV inputs
 The dashboard-first thesis workflow is feasible, but not with TradingView
 OHLCV alone.
 
-Best first path:
+Best first path after TickTradingData became unavailable/offline:
 
-1. Use **TickTradingData** as the cheapest NQ/MNQ L2 sample to prototype DOM /
-   OFI visuals and ingestion.
-2. Use **ThetaData Options Standard** as the first realistic NDX/QQQ options
+1. Use **Databento GLBX.MDP3** as the first clean API-backed NQ/MNQ L2 sample
+   path. Pull `MBP-10` for top-10 depth first; only use `MBO` if queue/order
+   identity becomes necessary.
+2. Use **Sierra Chart Denali** as the budget/manual fallback if Databento cost
+   is unacceptable. It can download CME historical market-depth data, but export
+   requires ACSIL/custom-study work rather than a normal CSV button.
+3. Use **ThetaData Options Standard** as the first realistic NDX/QQQ options
    data candidate because it exposes tick-level option data, chain snapshots,
    trade/quote request types, and OPRA NBBO quote coverage at retail pricing.
-3. Use **Nasdaq VOLQ / Cboe-style methodology** for IV/RV regime framing before
+4. Use **Nasdaq VOLQ / Cboe-style methodology** for IV/RV regime framing before
    trying to hand-roll a full IV surface.
-4. Keep **Databento** and **dxFeed/Bookmap/Quantower** as higher-quality or
-   live/replay candidates, not the cheapest starting point.
+5. Keep **Bookmap/dxFeed/Rithmic** as live visual/replay tools, not the primary
+   historical research backend unless export/API access is confirmed.
 
 ## Feasibility Matrix
 
 | Need | Candidate | What It Provides | Cost Signal | First-Pass Verdict |
 |---|---|---|---|---|
-| NQ/MNQ historical L2 | TickTradingData | CME futures tick data, trades/quotes, 10 levels of order-book depth, CSV/Parquet/NRD, NQ and MNQ listed | EUR 5 for 1 month, EUR 200 full history per instrument, free MNQ month advertised | Best cheap first sample. Must quality-check timestamps, depth reconstruction, and contract rollover handling before trusting results. |
-| NQ full-depth institutional replay | Databento GLBX.MDP3 | CME Globex MDP 3.0, full order book / MBO data, historical API, Python client, nanosecond timestamps | Usage/licensing based; new-user credit advertised | Best API-quality path if cheap samples are insufficient. More serious than needed for first visual prototype. |
-| Real-time / historical DOM platform | dxFeed retail via ATAS / Quantower / Bookmap | Market depth, historical charting, DOM/order-book visualization for CME futures depending on platform | Platform/data prices from about $19/month; Bookmap from about $37/month | Good for discretionary visual validation and live DOM feel. API/export suitability must be confirmed before using as research backend. |
+| NQ/MNQ historical L2 | Databento GLBX.MDP3 | CME Globex MDP 3.0, `MBP-10` top-10 market depth, `MBO` full order book, trades, Python/API/CSV/DBN output | Usage-based historical pricing, public free credits advertised | New first choice. Cleanest backend for dashboard ingestion and repeatable tests. Start with 1-3 RTH sessions of `MBP-10`, then scale only after schema works. |
+| NQ/MNQ budget/manual L2 | Sierra Chart Denali | CME market-depth history through Sierra Chart, with recent historical depth available for download/display | Platform + exchange fees; cheaper than institutional feeds if already used | Viable fallback if Georg can tolerate manual setup. Normal export does not include depth; needs ACSIL/custom extraction into CSV/Parquet. |
+| Real-time / historical DOM platform | Bookmap with dxFeed or Rithmic | Live full-depth CME futures visualization; dxFeed advertises full-depth futures and limited historical depth add-ons; Rithmic provides CME MBO into Bookmap | Platform/data monthly fees | Good for discretionary visual validation and recording forward. Use as research backend only if we confirm export/API access for depth events. |
 | Cheap futures tick, not L2 | Kibot | Tick data with bid/ask at transaction time | Paid packages; samples available | Not enough for DOM thesis. Kibot says it does not record bid/ask volume; reject for L2 order-flow imbalance. |
+| Legacy cheap L2 target | TickTradingData | Advertised CME tick data with trades/quotes and 10 depth levels | Previously cheapest visible path | Treat as unavailable unless Georg confirms it is reachable again. Do not block on it. |
 | Options flow / chain / IV | ThetaData Options Standard | US index/stock options, 8 years, tick-level data, option chain snapshots, every OPRA NBBO quote, trade/quote endpoint | $80/month retail | Best first options-flow candidate. Need verify NDX/QQQ coverage, Greeks/IV fields, and whether trade direction can be inferred robustly. |
 | Options aggregates / IV / OI | Polygon / Massive options plans | US options tickers, historical aggregates, Greeks/IV/OI on paid tiers | Starter around $29/month, Developer around $79/month in current public pricing | Useful cheaper fallback for aggregates. Likely weaker than ThetaData for tick-level flow / trade-quote reconstruction. |
 | Official IV benchmark | Nasdaq VOLQ | 30-day implied volatility of Nasdaq-100 based on NDX options | Methodology public; data access/licensing separate | Strong conceptual IV benchmark for NQ/NDX regime view. Use before hand-rolling IV if data is available. |
@@ -124,7 +129,7 @@ Do not buy a large dataset first.
 
 Start with:
 
-1. a free or one-month MNQ/NQ L2 sample
+1. 1-3 active RTH sessions of Databento `GLBX.MDP3` `MBP-10` for MNQ or NQ
 2. one month of options data if needed
 3. static dashboard views using sampled data or mock data with the exact target
    schema
@@ -134,11 +139,17 @@ and the tests are well-formed.
 
 ## Sources
 
-- TickTradingData. Historical CME futures tick data, 10 levels depth, pricing,
-  NQ/MNQ catalog. https://www.ticktradingdata.com/
 - Databento. CME Globex MDP 3.0 dataset and historical API. https://databento.com/datasets/GLBX.MDP3
 - Databento docs. GLBX.MDP3 feed details and CME MDP 3.0 normalization. https://databento.com/docs/venues-and-datasets/glbx-mdp3
+- Databento docs. `MBP-10` market-depth and `MBO` full-book schemas. https://databento.com/docs/schemas-and-data-formats
+- Databento pricing. Usage-based historical data and free signup credits. https://databento.com/pricing/
+- Sierra Chart. Market Depth Historical Graph / historical market-depth access. https://www.sierrachart.com/index.php?page=doc%2FMarketDepthHistoricalGraph.php
+- Sierra Chart support. Normal export does not export market-depth data; use programmatic access. https://www.sierrachart.com/SupportBoard.php?ThreadID=78406
+- NinjaTrader. Market Replay data contains synchronized Level I and Level II data. https://ninjatrader.com/support/helpGuides/nt8/set_up12.htm
 - dxFeed. Market data platforms and CME market-depth availability. https://choose.dxfeed.com/
+- Bookmap/dxFeed. Full-depth futures data and historical-depth add-on notes. https://bookmap.com/en/partner/dxfeed
+- Bookmap/Rithmic. CME futures full-depth/MBO notes. https://bookmap.com/en/partner/rithmic
+- TickTradingData. Previously listed historical CME futures tick data with 10 levels depth; currently unavailable for Georg. https://www.ticktradingdata.com/
 - Kibot support. Tick data limitation: no bid/ask volume recording. https://www.kibot.com/Support.aspx
 - ThetaData pricing. Options Standard includes tick-level data, chain snapshots,
   and OPRA NBBO quote coverage. https://www.thetadata.net/pricing
