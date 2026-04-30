@@ -27,6 +27,7 @@ def simulate_lucidflex_eval(
     *,
     ruleset: LucidFlex50K | None = None,
     seed: int | None = None,
+    rng: random.Random | None = None,
     max_days: int = 90,
 ) -> EvalAttemptResult:
     """Run one LucidFlex 50K evaluation attempt.
@@ -36,7 +37,7 @@ def simulate_lucidflex_eval(
     updates occur from the session close.
     """
     rules = ruleset or LucidFlex50K()
-    rng = random.Random(seed)
+    rng = rng or random.Random(seed)
 
     balance = float(rules.starting_balance)
     mll = float(rules.initial_mll)
