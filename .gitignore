@@ -50,6 +50,7 @@ Tasks/todo.md
 PineScripts/
 *.pine
 TVExports/
+Analysis/output/
 optimizer_output/
 optimizer_results/
 backtest_results/
