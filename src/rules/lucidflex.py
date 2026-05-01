@@ -23,9 +23,9 @@ class LucidFlex50K:
     """LucidFlex 50K rule parameters used by the simulator.
 
     Numeric values are taken directly from
-    ``Rulesets/LucidFlex/LucidFlex Rules.md``. Any value flagged as
-    ``[VERIFY]`` in the audit is reproduced here only as a working estimate
-    until dashboard verification — see ``eval_fee`` and ``reset_cost_estimate``.
+    ``Rulesets/LucidFlex/LucidFlex Rules.md``. Dashboard-only economics are
+    encoded from Georg's 2026-05-01 verification: 50K eval is $98 with the
+    nearly always available 30% coupon, and reset is $95.
     """
 
     account_size: int = 50_000
@@ -62,10 +62,11 @@ class LucidFlex50K:
     payout_min_daily_profit: int = 150
     max_simulated_payouts: int = 5
 
-    # [VERIFY] Both fees still need dashboard/commercial confirmation per the
-    # audit. Treat as provisional.
-    eval_fee: int = 175
-    reset_cost_estimate: int = 61
+    # Dashboard/commercial economics verified by Georg on 2026-05-01. Use the
+    # coupon-adjusted eval cost because the 30% coupon is nearly always
+    # available and is the realistic attempt cost for this model.
+    eval_fee: int = 98
+    reset_cost_estimate: int = 95
 
     # Source doc, "Trading Hours": "flat by 4:45 PM EST Mon-Fri; reopen
     # 6:00 PM EST Sun-Thu". The firm uses "EST" colloquially — the actual

@@ -216,8 +216,8 @@ class LucidFlexAccountState:
         """Reset a breached eval account.
 
         Only modeled for breached eval — funded breach is terminal in v1.
-        Resets cost ``reset_cost_estimate`` (provisional) and add to the fee
-        tally; the account returns to a pristine eval state.
+        Resets cost ``reset_cost_estimate`` and add to the fee tally; the
+        account returns to a pristine eval state.
         """
         if self.phase != LucidFlexPhase.BREACHED_EVAL:
             raise RuntimeError("LucidFlex reset is only modeled for breached eval accounts")

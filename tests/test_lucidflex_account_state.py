@@ -39,11 +39,11 @@ def test_lucidflex_account_eval_breach_and_reset() -> None:
 
     reset_cost = account.attempt_reset()
 
-    assert reset_cost == 61
+    assert reset_cost == 95
     assert account.phase == LucidFlexPhase.EVAL
     assert account.balance == 50_000
     assert account.mll == 48_000
-    assert account.total_fees_paid == 236
+    assert account.total_fees_paid == 193
 
 
 def test_lucidflex_account_funded_payout_and_terminal_max_payouts() -> None:
@@ -60,7 +60,7 @@ def test_lucidflex_account_funded_payout_and_terminal_max_payouts() -> None:
     assert account.phase == LucidFlexPhase.MAX_PAYOUTS
     assert account.payout_count == 5
     assert account.total_trader_payouts == total_received
-    assert account.net_ev == total_received - 175
+    assert account.net_ev == total_received - 98
 
 
 def test_lucidflex_account_funded_breach_after_pass() -> None:

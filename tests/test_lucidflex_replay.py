@@ -26,7 +26,7 @@ def test_replay_winning_days_reaches_max_payouts_with_phase_risk() -> None:
     assert result.payout_count == 5
     assert result.gross_payouts == 4_031.25
     assert result.trader_payouts == 3_628.125
-    assert result.net_ev == 3_453.125
+    assert result.net_ev == 3_530.125
 
 
 def test_replay_losing_days_breaches_eval_fee_only() -> None:
@@ -41,7 +41,7 @@ def test_replay_losing_days_breaches_eval_fee_only() -> None:
     assert result.eval_days == 2
     assert result.funded_days == 0
     assert result.trader_payouts == 0
-    assert result.net_ev == -175
+    assert result.net_ev == -98
 
 
 def test_replay_empty_days_count_toward_eval_timeout() -> None:
@@ -55,7 +55,7 @@ def test_replay_empty_days_count_toward_eval_timeout() -> None:
 
     assert result.terminal_reason == "eval_timeout"
     assert result.eval_days == 3
-    assert result.net_ev == -175
+    assert result.net_ev == -98
 
 
 def test_replay_requires_sorted_days() -> None:

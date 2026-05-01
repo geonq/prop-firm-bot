@@ -10,7 +10,7 @@ def test_pipeline_losing_strategy_loses_eval_fee_only() -> None:
     assert result.terminal_reason == "eval_breach"
     assert result.payout_count == 0
     assert result.trader_payouts == 0
-    assert result.net_ev == -175
+    assert result.net_ev == -98
 
 
 def test_pipeline_winning_strategy_reaches_max_simulated_payouts() -> None:
@@ -24,7 +24,7 @@ def test_pipeline_winning_strategy_reaches_max_simulated_payouts() -> None:
     assert result.payout_count == 5
     assert result.gross_payouts == 9_875
     assert result.trader_payouts == 8_887.5
-    assert result.net_ev == 8_712.5
+    assert result.net_ev == 8_789.5
 
 
 def test_pipeline_funded_timeout_keeps_collected_payouts() -> None:
@@ -35,7 +35,7 @@ def test_pipeline_funded_timeout_keeps_collected_payouts() -> None:
     assert result.terminal_reason == "funded_timeout"
     assert result.payout_count == 1
     assert result.trader_payouts == 1_687.5
-    assert result.net_ev == 1_512.5
+    assert result.net_ev == 1_589.5
 
 
 def test_pipeline_phase_aware_strategy_uses_lower_funded_risk() -> None:

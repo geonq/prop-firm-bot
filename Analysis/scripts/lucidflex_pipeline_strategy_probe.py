@@ -18,6 +18,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.pipeline.lucidflex_pipeline import LucidFlexPipelineResult, simulate_lucidflex_pipeline
+from src.rules.lucidflex import LucidFlex50K
 from src.strategies.parametric import BernoulliTradeStrategy
 
 
@@ -76,10 +77,11 @@ def run_cell(win_rate: float, rr_ratio: float, loss_size: float, cost_per_trade:
 
 
 def main() -> None:
+    rules = LucidFlex50K()
     print("LucidFlex 50K full-pipeline probe: synthetic ORB-like one-trade/day distributions")
     print(
         f"Simulations/cell: {N_SIMS:,} | Eval days: {MAX_EVAL_DAYS} | "
-        f"Funded days: {MAX_FUNDED_DAYS} | Eval fee: $175"
+        f"Funded days: {MAX_FUNDED_DAYS} | Eval fee: ${rules.eval_fee}"
     )
     print("Funded model: request payout whenever eligible; max 5 simulated payouts; same distribution in eval/funded.")
     print()
