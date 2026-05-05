@@ -27,7 +27,7 @@ Prop Firm Bot/
 ├── Rulesets/                  # rule documents pulled from official sources
 │   ├── LucidFlex/
 │   └── TopStep/
-├── Sources/                   # verbatim primary-source documents (e.g. founding-thesis transcript)
+├── Sources/                   # compact source summaries and provenance notes
 ├── Analysis/                  # research notes, sanity checks, literature reviews
 │   ├── scripts/               # standalone research/probe scripts
 │   └── strategy_specs/        # implementation contracts for candidate strategies
@@ -49,8 +49,8 @@ Prop Firm Bot/
 
 ## Current research artifacts
 
-- `Analysis/2026-04-30_strategy_shortlist_nq_prop_firm.md` — ranked NQ/MNQ strategy candidates for the prop-firm payoff model.
-- `Analysis/strategy_specs/torb_orb_v0.md` — exact v0 timely opening range breakout baseline spec.
+- `Analysis/2026-04-30_strategy_shortlist_nq_prop_firm.md` — compact retired shortlist; superseded by engine-targeted strategy research.
+- `Analysis/strategy_specs/torb_orb_v0.md` — retired ORB/TORB baseline note; not a candidate strategy.
 - `Analysis/2026-04-30_lucidflex_eval_probe_orb_proxy.md` — first synthetic ORB-like distribution probe against LucidFlex 50K evaluation rules.
 - `Analysis/2026-04-30_lucidflex_full_pipeline_probe_orb_proxy.md` — first synthetic ORB-like distribution probe through LucidFlex eval and funded payouts.
 - `Analysis/2026-04-30_lucidflex_phase_sizing_probe.md` — first synthetic phase-aware sizing probe using different eval/funded risk.
@@ -58,9 +58,19 @@ Prop Firm Bot/
 
 The ORB/TORB work is a falsification baseline, not an endorsed profitable strategy. Current evidence says low-risk ORB-like profiles timeout and higher-risk profiles breach often.
 
+Current next step: define the first real candidate strategy from the engine's target trade profile, then backtest/export/replay it. The project is not trying to find generic live-market EV first; market research only needs a distribution that can extract value from the prop-firm payoff structure.
+
 ## Current state machines
 
 - `src/pipeline/lucidflex_account.py` — canonical LucidFlex 50K account state machine for eval, funded payouts, breach, and eval reset.
+- `src/pipeline/lucidflex_pipeline.py` — synthetic LucidFlex eval-to-funded pipeline for parametric Monte Carlo probes.
 - `src/pipeline/lucidflex_replay.py` — deterministic LucidFlex replay path for dated trade R-multiple days, including no-trade days.
 - `src/data/replay_loader.py` — CSV loader for replay-day inputs using `session_date,r_multiple`.
+- `src/data/tv_trade_loader.py` — TradingView Strategy Tester XLSX loader that emits dated replay days from R or profit/P&L columns.
+- `Analysis/scripts/tv_lucidflex_replay_probe.py` — CLI replay probe for sweeping LucidFlex eval/funded risk on one TV export.
 - `src/pipeline/topstep_account.py` — canonical TopStep 50K No Activation Fee account state machine for Combine, XFA Standard/Consistency payout paths, optional DLL lock, Combine reset, and Back2Funded.
+- `src/pipeline/topstep_pipeline.py` — synthetic TopStep Combine-to-XFA pipeline for cross-firm parametric probes, including optional Back2Funded retries.
+- `src/pipeline/monte_carlo.py` — shared LucidFlex/TopStep Monte Carlo aggregation with EV and proportion confidence intervals.
+- `src/strategies/parametric.py` — i.i.d., phase-aware, state-aware, autocorrelated, and regime-switching synthetic trade generators.
+- `src/optimizer/search.py` — adaptive sizing grid search for LucidFlex or TopStep.
+- `src/optimizer/reset_economics.py` — reset-vs-fresh cost comparisons for LucidFlex and TopStep.
