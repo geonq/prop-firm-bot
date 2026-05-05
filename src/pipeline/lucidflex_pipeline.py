@@ -8,7 +8,23 @@ from dataclasses import dataclass
 from src.pipeline.eval_simulator import EvalAttemptResult
 from src.pipeline.lucidflex_account import LucidFlexAccountState, LucidFlexPhase
 from src.rules.lucidflex import LucidFlex50K
-from src.strategies.parametric import BernoulliTradeStrategy, PhaseAwareBernoulliStrategy
+from src.sizing.dynamic import SizingContext
+from src.strategies.parametric import (
+    AutocorrelatedPhaseAwareBernoulliStrategy,
+    BernoulliTradeStrategy,
+    PhaseAwareBernoulliStrategy,
+    RegimeSwitchingPhaseAwareBernoulliStrategy,
+    StateAwareBernoulliStrategy,
+)
+
+
+Strategy = (
+    BernoulliTradeStrategy
+    | PhaseAwareBernoulliStrategy
+    | StateAwareBernoulliStrategy
+    | AutocorrelatedPhaseAwareBernoulliStrategy
+    | RegimeSwitchingPhaseAwareBernoulliStrategy
+)
 
 
 @dataclass(frozen=True)
@@ -47,7 +63,7 @@ class LucidFlexPipelineResult:
 
 
 def simulate_lucidflex_pipeline(
-    strategy: BernoulliTradeStrategy | PhaseAwareBernoulliStrategy,
+    strategy: Strategy,
     *,
     ruleset: LucidFlex50K | None = None,
     seed: int | None = None,
@@ -57,6 +73,7 @@ def simulate_lucidflex_pipeline(
     """Run eval -> funded payouts -> breach/timeout for one LucidFlex attempt."""
     rules = ruleset or LucidFlex50K()
     rng = random.Random(seed)
+    _reset_strategy(strategy)
     account = LucidFlexAccountState(ruleset=rules)
     eval_days = 0
     funded_days = 0
@@ -65,7 +82,7 @@ def simulate_lucidflex_pipeline(
     for eval_day in range(1, max_eval_days + 1):
         eval_days = eval_day
         for _ in range(strategy.trades_per_day):
-            account.update(_sample_trade(strategy, rng, phase="eval"))
+            account.update(_sample_trade(strategy, rng, account=account, phase="eval"))
             if account.phase == LucidFlexPhase.BREACHED_EVAL:
                 eval_result = _account_eval_result(account, days_used=eval_day, timed_out=False)
                 break
@@ -102,7 +119,7 @@ def simulate_lucidflex_pipeline(
     for funded_day in range(1, max_funded_days + 1):
         funded_days = funded_day
         for _ in range(strategy.trades_per_day):
-            account.update(_sample_trade(strategy, rng, phase="funded"))
+            account.update(_sample_trade(strategy, rng, account=account, phase="funded"))
             if account.phase == LucidFlexPhase.BREACHED_FUNDED:
                 return LucidFlexPipelineResult(
                     eval_result=eval_result,
@@ -157,14 +174,37 @@ def simulate_lucidflex_pipeline(
 
 
 def _sample_trade(
-    strategy: BernoulliTradeStrategy | PhaseAwareBernoulliStrategy,
+    strategy: Strategy,
     rng: random.Random,
     *,
+    account: LucidFlexAccountState,
     phase: str,
 ) -> float:
-    if isinstance(strategy, PhaseAwareBernoulliStrategy):
+    if isinstance(strategy, StateAwareBernoulliStrategy):
+        ctx = SizingContext(
+            phase=phase,
+            balance=account.balance,
+            mll=account.mll,
+            starting_balance=float(account.ruleset.starting_balance),
+            payout_count=account.payout_count,
+        )
+        return strategy.sample_trade(rng, ctx=ctx)
+    if isinstance(
+        strategy,
+        (
+            PhaseAwareBernoulliStrategy,
+            AutocorrelatedPhaseAwareBernoulliStrategy,
+            RegimeSwitchingPhaseAwareBernoulliStrategy,
+        ),
+    ):
         return strategy.sample_trade(rng, phase=phase)
     return strategy.sample_trade(rng)
+
+
+def _reset_strategy(strategy: Strategy) -> None:
+    reset = getattr(strategy, "reset", None)
+    if callable(reset):
+        reset()
 
 
 def _account_eval_result(
