@@ -13,7 +13,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 
-DEFAULT_OUTPUT_DIR = Path("TVExports/l2_sample")
+DEFAULT_OUTPUT_DIR = Path("TVExports/mbp10_sample")
 
 
 def main() -> None:

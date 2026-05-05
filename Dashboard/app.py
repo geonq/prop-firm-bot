@@ -926,7 +926,7 @@ def render_runbook() -> None:
     st.code(
         ".venv/bin/python Analysis/scripts/databento_mbp10_sample.py --download-job JOB_ID\n"
         ".venv/bin/python Analysis/scripts/databento_mbp10_batch_report.py "
-        "TVExports/l2_sample --symbol MNQM6 --output-dir Analysis/output/mbp10_batch --overwrite",
+        "TVExports/mbp10_sample --symbol MNQM6 --output-dir Analysis/output/mbp10_batch --overwrite",
         language="zsh",
     )
     st.markdown(
