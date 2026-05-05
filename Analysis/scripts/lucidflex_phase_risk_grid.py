@@ -88,7 +88,15 @@ def summarize(
     )
 
 
-def run_cell(win_rate: float, rr_ratio: float, eval_risk: float, funded_risk: float) -> GridResult:
+def run_cell(
+    win_rate: float,
+    rr_ratio: float,
+    eval_risk: float,
+    funded_risk: float,
+    n_sims: int = N_SIMS,
+    max_eval_days: int = MAX_EVAL_DAYS,
+    max_funded_days: int = MAX_FUNDED_DAYS,
+) -> GridResult:
     strategy = PhaseAwareBernoulliStrategy(
         win_rate=win_rate,
         rr_ratio=rr_ratio,
@@ -103,12 +111,38 @@ def run_cell(win_rate: float, rr_ratio: float, eval_risk: float, funded_risk: fl
         simulate_lucidflex_pipeline(
             strategy,
             seed=seed_base + i,
-            max_eval_days=MAX_EVAL_DAYS,
-            max_funded_days=MAX_FUNDED_DAYS,
+            max_eval_days=max_eval_days,
+            max_funded_days=max_funded_days,
         )
-        for i in range(N_SIMS)
+        for i in range(n_sims)
     )
     return summarize(win_rate, rr_ratio, eval_risk, funded_risk, results)
+
+
+def run_grid(
+    profiles: Iterable[tuple[float, float]],
+    eval_risks: Iterable[float],
+    funded_risks: Iterable[float],
+    n_sims: int = N_SIMS,
+    max_eval_days: int = MAX_EVAL_DAYS,
+    max_funded_days: int = MAX_FUNDED_DAYS,
+) -> list[GridResult]:
+    rows: list[GridResult] = []
+    for win_rate, rr_ratio in profiles:
+        for eval_risk in eval_risks:
+            for funded_risk in funded_risks:
+                rows.append(
+                    run_cell(
+                        win_rate,
+                        rr_ratio,
+                        eval_risk,
+                        funded_risk,
+                        n_sims=n_sims,
+                        max_eval_days=max_eval_days,
+                        max_funded_days=max_funded_days,
+                    )
+                )
+    return rows
 
 
 def print_table(title: str, rows: list[GridResult], limit: int = 12) -> None:
@@ -145,11 +179,7 @@ def main() -> None:
     print("Synthetic WR/RR only; this does not validate a market edge.")
     print()
 
-    rows: list[GridResult] = []
-    for win_rate, rr_ratio in PROFILES:
-        for eval_risk in EVAL_RISKS:
-            for funded_risk in FUNDED_RISKS:
-                rows.append(run_cell(win_rate, rr_ratio, eval_risk, funded_risk))
+    rows = run_grid(PROFILES, EVAL_RISKS, FUNDED_RISKS)
 
     by_mean_ev = sorted(rows, key=lambda row: row.mean_net_ev, reverse=True)
     by_profile_best = []

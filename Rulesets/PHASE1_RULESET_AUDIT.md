@@ -14,10 +14,10 @@ Line-by-line cross-check against `Rulesets/LucidFlex/LucidFlex Rules.md` and `Ru
 - LucidFlex funded scaling: 2/3/4 minis at $0–$999 / $1,000–$1,999 / $2,000+.
 - TopStep 50K NoFee: Combine $50K start, MLL $2,000 trailing then locked at $50,000 (no buffer); XFA $0 displayed start, MLL trails -$2,000 → $0; 5 mini Combine cap; $1,000 optional DLL (session-only, not a violation); $95/mo subscription, $109 reset, $0 activation; Back2Funded $599 max 2 pre-first-payout.
 - TopStep payouts: min $125; Standard cap $2,000 / Consistency cap $3,000; 5×$150 days (Standard) or 3 days with largest ≤40% (Consistency); 90/10 split; MLL set to $0 after each payout.
+- TopStep XFA 50K scaling, verified 2026-05-05 from Topstep public rules table: $0–$1,500 → 2 lots; $1,500+ → 3 lots; $2,000+ → 5 lots; updates after daily Trade Report, not intraday; TopstepX micros use 10:1 mini equivalent.
 
 **Still gated (cannot verify from text source):**
 - LucidFlex eval fee ($175) and reset cost (~$61) — dashboard verification needed.
-- TopStep XFA scaling tiers (`src/rules/topstep.py:max_contracts` xfa branch) — third-party-derived; source doc shows scaling plan as graphs only.
 - Time-of-day rules (news embargo, EOD flatten, weekend hold) — present in source docs but not yet encoded into Python modules.
 
 **Test coverage:** `tests/test_rulesets.py` pins all four Phase 1 exit-criteria categories (breach at exact threshold, consistency violation, payout eligibility math, `max_contracts` per phase) for both firms. Boundary tests are deliberately tight (1500/3000 passes, 1501/3000 fails) so any future encoding drift surfaces immediately. Full suite: 75 passing.
