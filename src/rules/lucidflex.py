@@ -64,9 +64,13 @@ class LucidFlex50K:
 
     # Dashboard/commercial economics verified by Georg on 2026-05-01. Use the
     # coupon-adjusted eval cost because the 30% coupon is nearly always
-    # available and is the realistic attempt cost for this model.
+    # available and is the realistic attempt cost outside vault promos.
+    base_eval_fee: int = 140
     eval_fee: int = 98
     reset_cost_estimate: int = 95
+    vault_discount_account_count: int = 5
+    vault_discount_floor: float = 0.40
+    vault_discount_ceiling: float = 0.50
 
     # Source doc, "Trading Hours": "flat by 4:45 PM EST Mon-Fri; reopen
     # 6:00 PM EST Sun-Thu". The firm uses "EST" colloquially — the actual
@@ -88,6 +92,37 @@ class LucidFlex50K:
     @property
     def pass_balance(self) -> int:
         return self.account_size + self.profit_target
+
+    def eval_fee_from_discount(self, discount: float) -> int:
+        """Return rounded 50K eval cost after a realized discount.
+
+        ``discount`` is expressed as a fraction: 0.40 means 40% off the base
+        eval price. This intentionally models realized commercial pricing; it
+        is not a trading rule.
+        """
+        if not 0 <= discount < 1:
+            raise ValueError("discount must be in [0, 1)")
+        return round(self.base_eval_fee * (1 - discount))
+
+    def eval_fee_for_vault_account(
+        self,
+        *,
+        accounts_used_in_cycle: int,
+        realized_discount: float | None,
+    ) -> int:
+        """Return current eval fee given the active vault-cycle state.
+
+        LucidFlex vault-cycle discounts are only modeled when Georg supplies
+        the realized discount. If no realized discount is known, fall back to
+        the normal coupon-adjusted ``eval_fee``.
+        """
+        if accounts_used_in_cycle < 0:
+            raise ValueError("accounts_used_in_cycle must be non-negative")
+        if realized_discount is None:
+            return self.eval_fee
+        if accounts_used_in_cycle >= self.vault_discount_account_count:
+            return self.eval_fee
+        return self.eval_fee_from_discount(realized_discount)
 
     def update_mll_after_close(self, closing_balance: float, current_mll: float) -> float:
         """Apply the EOD trailing-drawdown update.

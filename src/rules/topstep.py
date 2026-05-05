@@ -1,15 +1,14 @@
 """TopStep 50K No Activation Fee ruleset encoding.
 
 Source documents:
-- ``Rulesets/TopStep/TopStep NoFee.md`` (compiled encoding reference + verbatim
-  paste from the official help center)
+- ``Rulesets/TopStep/TopStep NoFee.md`` (compact encoding reference)
 - ``Rulesets/PHASE1_RULESET_AUDIT.md`` (Phase 1 reviewer audit notes)
 
 Reviewer pass: Claude Code, 2026-04-30. The Trading Combine ("eval") and
-Express Funded Account ("XFA", funded) are encoded as separate phases. XFA
-scaling tiers in ``max_contracts`` remain provisional — the source doc shows
-them as graphs only and the audit flags them as third-party-derived until
-dashboard verification.
+Express Funded Account ("XFA", funded) are encoded as separate phases. XFA 50K
+scaling tiers were verified against Topstep's public 2026 Live Funded Account
+rules table on 2026-05-05; the help-center scaling page still displays the same
+concept as an image.
 """
 
 from __future__ import annotations
@@ -36,9 +35,7 @@ class TopStepPayoutPath(StrEnum):
 class TopStepNoFee50K:
     """TopStep 50K No Activation Fee path.
 
-    Numeric values are taken from
-    ``Rulesets/TopStep/TopStep NoFee.md``. Items marked ``[VERIFY]`` in the
-    audit (XFA scaling tiers) remain reviewer-gated.
+    Numeric values are taken from ``Rulesets/TopStep/TopStep NoFee.md``.
     """
 
     account_size: int = 50_000
@@ -192,11 +189,10 @@ class TopStepNoFee50K:
         Combine: flat ceiling per source doc, "Trading Combine Maximum
         Position Size" — 5 minis / 50 micros for 50K, no scaling.
 
-        XFA: scaling-plan tiers from the audit's third-party-sourced 50K
-        table. **Reviewer-gated** until dashboard graph confirmation:
-            < $1,500           → 2 lots
-            $1,500 – $2,000    → 3 lots
-            > $2,000           → 5 lots (cap)
+        XFA: scaling-plan tiers verified against Topstep's public rules table:
+            $0 - $1,500 Profit → 2 lots
+            $1,500+ Profit     → 3 lots
+            $2,000+ Profit     → 5 lots (cap)
         """
         if phase == "combine":
             return self.combine_max_micro_contracts if micros else self.combine_max_mini_contracts
@@ -205,12 +201,9 @@ class TopStepNoFee50K:
             msg = f"unknown TopStep phase: {phase}"
             raise ValueError(msg)
 
-        # [VERIFY] XFA tier boundaries from audit. Lower edge of $1,500–$2,000
-        # is inclusive in the source table, encoded as ``< 1_500`` then
-        # ``elif <= 2_000``.
         if balance < 1_500:
             minis = 2
-        elif balance <= 2_000:
+        elif balance < 2_000:
             minis = 3
         else:
             minis = 5

@@ -284,13 +284,13 @@ class TestTopStepMaxContracts:
         assert rules.max_contracts(phase="combine", micros=True) == 50
 
     def test_xfa_scaling_tiers(self) -> None:
-        # XFA scaling is reviewer-gated (graph-derived); these assertions
-        # pin the *current* encoding so a regression is caught.
+        # Source table: $0-$1,500 → 2, $1,500+ → 3, $2,000+ → 5.
         rules = TopStepNoFee50K()
         assert rules.max_contracts(phase="xfa", balance=0) == 2
         assert rules.max_contracts(phase="xfa", balance=1_499) == 2
         assert rules.max_contracts(phase="xfa", balance=1_500) == 3
-        assert rules.max_contracts(phase="xfa", balance=2_000) == 3
+        assert rules.max_contracts(phase="xfa", balance=1_999) == 3
+        assert rules.max_contracts(phase="xfa", balance=2_000) == 5
         assert rules.max_contracts(phase="xfa", balance=2_001) == 5
         assert rules.max_contracts(phase="xfa", balance=10_000) == 5
 
