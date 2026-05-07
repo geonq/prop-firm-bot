@@ -20,32 +20,49 @@ Local-only files such as `Tasks/todo.md`, `CLAUDE.md`, and `REFERENCE.md` may ex
 
 Phases 1–5 build the engine. Phase 6 (separate) builds a bot that executes the engine's recommendation. The bot does not start until the engine produces a clear answer.
 
-## Project layout
+## Folder Guide
+
+Use this section when you need to find something quickly.
 
 ```
 Prop Firm Bot/
-├── Rulesets/                  # rule documents pulled from official sources
-│   ├── LucidFlex/
-│   └── TopStep/
+├── Coordination/              # Start here for agent state
+│   ├── HANDOFF.md             # current status + next concrete task
+│   ├── CHANGELOG.md           # append-only history
+│   └── DECISIONS.md           # settled decisions
+├── Research/                  # Current strategy research surface
+│   ├── StrategyCapture/       # Georg's discretionary model capture comes first
+│   │   └── georg_model_v1/    # screenshots ignored, processed notes/specs tracked
+│   └── ConfluenceResearch/    # papers, ICT, order-flow feature research
+│       ├── raw_materials/     # ignored: videos, PDFs, screenshots, course material
+│       ├── processed/         # tracked compact notes/transcripts/screenshots
+│       └── specs/             # candidate specs before implementation
+├── Analysis/                  # Formal analysis outputs and scripts
+│   ├── scripts/               # replay probes, MC runners, registry builders
+│   └── strategy_specs/        # older tracked strategy specs / baselines
 ├── Sources/                   # compact source summaries and provenance notes
-├── Analysis/                  # research notes, sanity checks, literature reviews
-│   ├── scripts/               # standalone research/probe scripts
-│   └── strategy_specs/        # implementation contracts for candidate strategies
-├── Coordination/              # tracked Codex/Claude handoff + changelog
-├── Notebooks/                 # .ipynb validation + exploration
-├── Tasks/                     # local-only todo.md, ignored
-├── Dashboard/                 # streamlit app
-├── PineScripts/               # TradingView Pine source
-├── TVExports/                 # XLSX strategy tester exports (gitignored)
+├── Rulesets/                  # official-rule summaries and reviewer audit surface
+├── Dashboard/                 # Streamlit dashboard
 ├── src/
-│   ├── rules/                 # encoded LucidFlex / TopStep rule modules
-│   ├── strategies/            # parametric trade generators
-│   ├── sizing/                # dynamic sizing functions
-│   ├── pipeline/              # account state machine, simulator, monte carlo
-│   ├── optimizer/             # parameter search
-│   └── data/                  # TV export loader
-└── tests/
+│   ├── rules/                 # encoded LucidFlex / TopStep rules
+│   ├── pipeline/              # account state machines, replay, Monte Carlo
+│   ├── sizing/                # fixed/adaptive sizing functions
+│   ├── strategies/            # synthetic trade generators
+│   ├── optimizer/             # sizing/parameter search
+│   └── data/                  # TradingView/replay loaders
+├── tests/                     # pytest suite
+├── PineScripts/               # ignored: local TradingView Pine files
+├── TVExports/                 # ignored: local XLSX/CSV exports
+├── Tasks/                     # ignored: local phase map / todo
+└── Notebooks/                 # legacy notebooks; scripts are preferred
 ```
+
+## Current Research Flow
+
+1. **Capture Georg's strategy first.** Use `Research/StrategyCapture/georg_model_v1/` for screenshots and processed notes. The goal is to mechanize clean/choppy selection, liquidity draw, entry, invalidation, and target logic.
+2. **Simulate the rough model.** Compare against the attractive target geometry Georg described: about 10% WR, 10R average, $200 fixed risk.
+3. **Then deepen research.** Use `Research/ConfluenceResearch/` for papers, ICT videos, and order-flow ideas. Raw videos/PDFs stay ignored; processed notes and candidate specs are tracked.
+4. **Promote only through validation.** Candidate specs need ablations and a predeclared IS/OOS split before coding or TradingView exports.
 
 ## Current research artifacts
 
