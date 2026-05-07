@@ -1,0 +1,54 @@
+================================================================
+  PROP FIRM BOT — DASHBOARD LAUNCH (no Claude / no Codex needed)
+================================================================
+
+OPEN A FRESH TERMINAL AND PASTE EITHER BLOCK BELOW.
+
+
+----------------------------------------------------------------
+ 1. JUST LAUNCH THE DASHBOARD (uses last-built artifacts)
+----------------------------------------------------------------
+
+cd "/Users/georgdomke/Arbeit/VS Code/Prop Firm Bot" && \
+source .venv/bin/activate && \
+streamlit run Dashboard/app.py
+
+The dashboard opens in your browser at http://localhost:8501.
+Click the tab "TV Strategies & MC".
+Press Ctrl+C in the terminal to stop the server.
+
+
+----------------------------------------------------------------
+ 2. REFRESH ARTIFACTS FROM TVExports/, THEN LAUNCH
+----------------------------------------------------------------
+
+Use this every time you drop new xlsx files in TVExports/.
+
+cd "/Users/georgdomke/Arbeit/VS Code/Prop Firm Bot" && \
+source .venv/bin/activate && \
+python Analysis/scripts/build_strategy_registry.py && \
+streamlit run Dashboard/app.py
+
+The build step takes ~3 minutes per strategy at 10k MC paths
+(both TopStep 50K and LucidFlex 50K). Skip MC with --skip-mc
+if you only want to see ingest + screening results:
+
+cd "/Users/georgdomke/Arbeit/VS Code/Prop Firm Bot" && \
+source .venv/bin/activate && \
+python Analysis/scripts/build_strategy_registry.py --skip-mc && \
+streamlit run Dashboard/app.py
+
+
+----------------------------------------------------------------
+ NOTES
+----------------------------------------------------------------
+
+- Browser tab not opening? Visit http://localhost:8501 manually.
+- Port already in use? Streamlit will pick the next free port —
+  watch the terminal output for the URL.
+- venv missing? Recreate with:
+    python3 -m venv .venv
+    source .venv/bin/activate
+    pip install -r requirements.txt
+- All artifacts live under Analysis/output/tv_strategies/ and
+  Analysis/output/mc_runs/. Safe to delete to start fresh.
