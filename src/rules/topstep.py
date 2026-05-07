@@ -56,6 +56,7 @@ class TopStepNoFee50K:
     # and XFA, automatic in Live. Hitting it locks the session only — it is
     # NOT a rule violation.
     daily_loss_limit: int = 1_000
+    price_limit_buffer: float = 0.02
 
     # Source doc, "Pricing": post-2026-04-28 No Activation Fee path.
     nofee_monthly_fee: int = 95
@@ -176,6 +177,27 @@ class TopStepNoFee50K:
 
     def trader_payout_amount(self, gross_request: float) -> float:
         return gross_request * self.profit_split
+
+    def is_within_price_limit_buffer(
+        self,
+        *,
+        net_change_pct: float,
+        price_limit_pct: float,
+    ) -> bool:
+        """Return True when TopStep prohibits market participation.
+
+        Current TopStep help text says it will not allow participation when a
+        product is trading within 2% of a CME price limit. Price limits vary by
+        product/session, so callers must pass the current CME limit for the
+        contract/session being traded. For NQ/MNQ equity index products,
+        TopStep notes overnight limits expanded to 7%, but this helper remains
+        parameterized because CME limits can change.
+        """
+        if not 0 < self.price_limit_buffer < 1:
+            raise ValueError("price_limit_buffer must be in (0, 1)")
+        if not self.price_limit_buffer < price_limit_pct < 1:
+            raise ValueError("price_limit_pct must be greater than buffer and less than 1")
+        return abs(net_change_pct) >= price_limit_pct - self.price_limit_buffer
 
     def max_contracts(
         self,

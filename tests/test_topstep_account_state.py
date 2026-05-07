@@ -156,6 +156,44 @@ def test_topstep_back2funded_unavailable_after_first_payout() -> None:
         raise AssertionError("expected Back2Funded to be unavailable after payout")
 
 
+def test_topstep_back2funded_hard_limit_is_enforced() -> None:
+    account = TopStepNoFeeAccountState()
+    pass_combine(account)
+
+    for expected_count in (1, 2):
+        account.update(-2_000)
+        assert account.phase == TopStepPhase.XFA_CLOSED
+        account.attempt_back2funded()
+        assert account.phase == TopStepPhase.XFA
+        assert account.back2funded_count == expected_count
+
+    account.update(-2_000)
+    assert account.phase == TopStepPhase.XFA_CLOSED
+
+    try:
+        account.attempt_back2funded()
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError("expected Back2Funded hard limit to reject third use")
+
+
+def test_topstep_consistency_path_blocks_lopsided_payout_cycle() -> None:
+    account = TopStepNoFeeAccountState(payout_path=TopStepPayoutPath.CONSISTENCY)
+    pass_combine(account)
+
+    close_xfa_day(account, 2_000)
+    close_xfa_day(account, 500)
+    close_xfa_day(account, 500)
+
+    try:
+        account.request_payout()
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError("expected lopsided consistency cycle to block payout")
+
+
 def test_topstep_optional_dll_locks_only_until_day_close() -> None:
     account = TopStepNoFeeAccountState(use_daily_loss_limit=True)
 

@@ -16,8 +16,24 @@ Line-by-line cross-check against `Rulesets/LucidFlex/LucidFlex Rules.md` and `Ru
 - TopStep payouts: min $125; Standard cap $2,000 / Consistency cap $3,000; 5×$150 days (Standard) or 3 days with largest ≤40% (Consistency); 90/10 split; MLL set to $0 after each payout.
 - TopStep XFA 50K scaling, verified 2026-05-05 from Topstep public rules table: $0–$1,500 → 2 lots; $1,500+ → 3 lots; $2,000+ → 5 lots; updates after daily Trade Report, not intraday; TopstepX micros use 10:1 mini equivalent.
 
-**Still gated (cannot verify from text source):**
-- LucidFlex eval fee ($175) and reset cost (~$61) — dashboard verification needed.
-- Time-of-day rules (news embargo, EOD flatten, weekend hold) — present in source docs but not yet encoded into Python modules.
+**Later corrected:**
+- LucidFlex eval/reset economics updated from Georg dashboard verification on 2026-05-01.
+- Time-of-day helpers and deployment compliance helpers added in later passes.
 
 **Test coverage:** `tests/test_rulesets.py` pins all four Phase 1 exit-criteria categories (breach at exact threshold, consistency violation, payout eligibility math, `max_contracts` per phase) for both firms. Boundary tests are deliberately tight (1500/3000 passes, 1501/3000 fails) so any future encoding drift surfaces immediately. Full suite: 75 passing.
+
+## Deployment Pass — 2026-05-06 (Codex)
+
+Fresh public-source check for previously deferred deployment risks.
+
+**Encoded:**
+- TopStep price-limit proximity helper: no participation within 2% of current CME product/session price limit.
+- LucidFlex microscalping helper: flags when >50% of positive profits come from trades held ≤5 seconds.
+- LucidFlex HFT helper: configurable order-rate hard stop because public text is qualitative, not numeric.
+- TradingView audit parser pairs entry/exit rows to expose hold seconds and P&L.
+
+**Not encoded as hard EV rules:**
+- News trading: current checked public sources did not show a blanket TopStep/LucidFlex news embargo.
+- Price-limit percentages: caller must supply current CME limits because they vary and update.
+
+**Test coverage:** deployment helpers covered in `tests/test_rulesets.py` and `tests/test_tv_trade_audit.py`.

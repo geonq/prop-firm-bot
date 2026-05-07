@@ -21,6 +21,11 @@ DEFAULT_DATETIME_COLUMNS = (
     "date time",
     "time",
     "date",
+    "datum und uhrzeit",
+    "datum/uhrzeit",
+    "datum uhrzeit",
+    "uhrzeit",
+    "datum",
 )
 DEFAULT_R_MULTIPLE_COLUMNS = (
     "r_multiple",
@@ -35,6 +40,18 @@ DEFAULT_PROFIT_COLUMNS = (
     "net profit usd",
     "p&l",
     "pnl",
+    "g&v netto",
+    "g&v netto usd",
+    "gv netto",
+    "gv netto usd",
+    "netto g&v",
+    "netto g&v usd",
+    "gewinn verlust netto",
+    "gewinn verlust netto usd",
+)
+DEFAULT_TRADE_TYPE_COLUMNS = (
+    "type",
+    "typ",
 )
 
 
@@ -129,10 +146,19 @@ def _load_from_rows(
             label="profit",
             banned=("cum profit", "cumulative profit"),
         )
+    type_index = _column_index(
+        headers,
+        requested=None,
+        candidates=DEFAULT_TRADE_TYPE_COLUMNS,
+        label="trade type",
+        required=False,
+    )
 
     rows_by_date: dict[date, list[float]] = defaultdict(list)
     for row_number, row in enumerate(rows[header_index + 1 :], start=header_index + 2):
         if _is_blank_row(row):
+            continue
+        if type_index is not None and not _is_exit_row(_get_cell(row, type_index)):
             continue
         session_date = _parse_session_date(_get_cell(row, datetime_index), row_number=row_number, column=headers[datetime_index])
         if r_index is not None:
@@ -277,6 +303,11 @@ def _parse_number(value: Any, *, row_number: int, column: str) -> float:
     except ValueError as exc:
         raise ValueError(f"invalid number in row {row_number}, column {column}: {value!r}") from exc
     return -number if negative else number
+
+
+def _is_exit_row(value: Any) -> bool:
+    normalized = _normalize_header("" if value is None else str(value))
+    return "exit" in normalized or "ausstieg" in normalized or "close" in normalized
 
 
 def _to_replay_days(

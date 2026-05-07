@@ -104,6 +104,39 @@ class TestLucidFlexPayoutMath:
         assert rules.trader_payout_amount(1_000) == pytest.approx(900.0)
 
 
+class TestLucidFlexDeploymentCompliance:
+    def test_microscalping_share_uses_positive_profit_only(self) -> None:
+        rules = LucidFlex50K()
+
+        share = rules.microscalping_profit_share(
+            trade_profits=[100, -500, 75, 25],
+            hold_seconds=[5, 2, 6, 1],
+        )
+
+        assert share == pytest.approx(125 / 200)
+        assert rules.microscalping_flagged([100, -500, 75, 25], [5, 2, 6, 1])
+
+    def test_microscalping_no_positive_profit_is_not_flagged(self) -> None:
+        rules = LucidFlex50K()
+
+        assert rules.microscalping_profit_share([-100, -50], [1, 2]) == 0.0
+        assert not rules.microscalping_flagged([-100, -50], [1, 2])
+
+    def test_order_rate_guard_is_operator_parameterized(self) -> None:
+        rules = LucidFlex50K()
+
+        assert rules.order_rate_flagged(
+            order_count=121,
+            window_minutes=1,
+            max_orders_per_minute=120,
+        )
+        assert not rules.order_rate_flagged(
+            order_count=120,
+            window_minutes=1,
+            max_orders_per_minute=120,
+        )
+
+
 class TestLucidFlexMaxContracts:
     def test_eval_phase_is_flat_4_or_40(self) -> None:
         rules = LucidFlex50K()
@@ -275,6 +308,33 @@ class TestTopStepPayoutMath:
     def test_trader_split_is_90_10(self) -> None:
         rules = TopStepNoFee50K()
         assert rules.trader_payout_amount(1_000) == pytest.approx(900.0)
+
+
+class TestTopStepDeploymentCompliance:
+    def test_price_limit_buffer_blocks_within_two_percent(self) -> None:
+        rules = TopStepNoFee50K()
+
+        assert not rules.is_within_price_limit_buffer(
+            net_change_pct=-0.0499,
+            price_limit_pct=0.07,
+        )
+        assert rules.is_within_price_limit_buffer(
+            net_change_pct=-0.05,
+            price_limit_pct=0.07,
+        )
+        assert rules.is_within_price_limit_buffer(
+            net_change_pct=0.05,
+            price_limit_pct=0.07,
+        )
+
+    def test_price_limit_requires_current_cme_limit_input(self) -> None:
+        rules = TopStepNoFee50K()
+
+        with pytest.raises(ValueError):
+            rules.is_within_price_limit_buffer(
+                net_change_pct=0.01,
+                price_limit_pct=0.01,
+            )
 
 
 class TestTopStepMaxContracts:

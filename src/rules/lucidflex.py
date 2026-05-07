@@ -61,6 +61,8 @@ class LucidFlex50K:
     payout_min_profitable_days: int = 5
     payout_min_daily_profit: int = 150
     max_simulated_payouts: int = 5
+    microscalping_hold_seconds: int = 5
+    microscalping_profit_share_limit: float = 0.50
 
     # Dashboard/commercial economics verified by Georg on 2026-05-01. Use the
     # coupon-adjusted eval cost because the 30% coupon is nearly always
@@ -72,10 +74,10 @@ class LucidFlex50K:
     vault_discount_floor: float = 0.40
     vault_discount_ceiling: float = 0.50
 
-    # Source doc, "Trading Hours": "flat by 4:45 PM EST Mon-Fri; reopen
-    # 6:00 PM EST Sun-Thu". The firm uses "EST" colloquially — the actual
-    # timezone is America/New_York, which handles EST/EDT transitions.
-    # Holding past flatten_time = breach. Weekend hold prohibited.
+    # Current public doc, "Allowed Trading Times": "flat by 4:45 PM EST
+    # Mon-Fri; reopen 6:00 PM EST Sun-Thu". Lucid auto-closes open positions
+    # at the cutoff and says holding past it does not fail the account. We
+    # still expose ``must_be_flat`` so bot/order logic can avoid forced exits.
     timezone: ZoneInfo = field(default_factory=lambda: ZoneInfo("America/New_York"))
     flatten_time: time = time(16, 45)
     reopen_time: time = time(18, 0)
@@ -184,6 +186,62 @@ class LucidFlex50K:
         """Apply the 90/10 split to a gross payout request."""
         return gross_request * self.funded_profit_split
 
+    def microscalping_profit_share(
+        self,
+        trade_profits: list[float],
+        hold_seconds: list[float],
+    ) -> float:
+        """Share of positive profits from trades held at most 5 seconds.
+
+        Current Lucid help text flags accounts if more than 50% of profits are
+        generated from trades held for 5 seconds or less. Losses are excluded
+        from the denominator because the policy describes profit generation,
+        not net P&L.
+        """
+        if len(trade_profits) != len(hold_seconds):
+            raise ValueError("trade_profits and hold_seconds must have same length")
+        total_positive_profit = sum(max(0.0, pnl) for pnl in trade_profits)
+        if total_positive_profit <= 0:
+            return 0.0
+        fast_positive_profit = sum(
+            max(0.0, pnl)
+            for pnl, seconds in zip(trade_profits, hold_seconds, strict=True)
+            if seconds <= self.microscalping_hold_seconds
+        )
+        return fast_positive_profit / total_positive_profit
+
+    def microscalping_flagged(
+        self,
+        trade_profits: list[float],
+        hold_seconds: list[float],
+    ) -> bool:
+        """Return whether Lucid's published microscalping flag is tripped."""
+        return (
+            self.microscalping_profit_share(trade_profits, hold_seconds)
+            > self.microscalping_profit_share_limit
+        )
+
+    def order_rate_flagged(
+        self,
+        *,
+        order_count: int,
+        window_minutes: float,
+        max_orders_per_minute: float,
+    ) -> bool:
+        """Configurable HFT guard for Lucid's qualitative HFT prohibition.
+
+        Lucid's public HFT article describes high order volume in very short
+        time frames but does not publish one canonical numeric threshold.
+        Deployment code must therefore supply the operator's chosen hard stop.
+        """
+        if order_count < 0:
+            raise ValueError("order_count must be non-negative")
+        if window_minutes <= 0:
+            raise ValueError("window_minutes must be positive")
+        if max_orders_per_minute <= 0:
+            raise ValueError("max_orders_per_minute must be positive")
+        return order_count / window_minutes > max_orders_per_minute
+
     def max_contracts(
         self,
         *,
@@ -227,6 +285,10 @@ class LucidFlex50K:
         Saturday is fully flat. Sunday is flat until 6:00 PM (reopen for the
         Monday session). Friday is flat from 4:45 PM through the weekend.
         Mon-Thu have a daily 4:45 PM-6:00 PM closed window.
+
+        Current public Lucid text says open positions are automatically closed
+        at 4:45 PM and that holding past this time does not fail the account.
+        Treat True as "must not initiate/hold intentionally", not as a breach.
 
         ``ts`` must be timezone-aware. Naive datetimes raise ``ValueError`` —
         silently assuming UTC or local time would be a correctness trap when

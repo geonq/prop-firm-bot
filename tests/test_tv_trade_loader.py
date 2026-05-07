@@ -60,6 +60,26 @@ def test_load_tv_strategy_replay_days_xlsx_searches_sheets(tmp_path: Path) -> No
     assert days[0].r_multiples == (1.5,)
 
 
+def test_load_tv_strategy_replay_days_xlsx_accepts_german_trade_headers(tmp_path: Path) -> None:
+    xlsx_path = tmp_path / "tv_export_german.xlsx"
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = "Liste der Trades"
+    worksheet.append(["Trade #", "Typ", "Datum und Uhrzeit", "Signal", "Preis", "Größe", "G&V netto USD"])
+    worksheet.append([1, "Exit", "2026-01-05 10:15", "Long Exit", 100, 1, 200])
+    worksheet.append([1, "Einstieg", "2026-01-05 09:45", "Long", 90, 1, 200])
+    worksheet.append([2, "Exit", "2026-01-06 12:30", "Short Exit", 100, 1, -50])
+    worksheet.append([2, "Einstieg", "2026-01-06 12:00", "Short", 110, 1, -50])
+    workbook.save(xlsx_path)
+    workbook.close()
+
+    days = load_tv_strategy_replay_days_xlsx(xlsx_path, risk_amount=100)
+
+    assert [day.session_date.isoformat() for day in days] == ["2026-01-05", "2026-01-06"]
+    assert days[0].r_multiples == (2.0,)
+    assert days[1].r_multiples == (-0.5,)
+
+
 def test_load_tv_strategy_replay_days_xlsx_requires_risk_when_only_profit_exists(tmp_path: Path) -> None:
     xlsx_path = tmp_path / "tv_export.xlsx"
     workbook = Workbook()
