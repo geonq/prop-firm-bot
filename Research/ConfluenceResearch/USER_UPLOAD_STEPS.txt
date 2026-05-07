@@ -1,0 +1,106 @@
+WHAT TO DO WITH ICT / YOUTUBE / PDF MATERIAL
+
+Goal:
+Turn your raw learning material into a compact research dataset Codex and Claude can use without wasting context on full videos every session.
+
+Step 1 — Put raw files here
+
+Use this local folder:
+
+  Research/ConfluenceResearch/raw_materials/
+
+Suggested layout:
+
+  raw_materials/videos/   downloaded videos, screen recordings
+  raw_materials/pdfs/     PDFs, course slides, exported articles
+  raw_materials/notes/    your notes, timestamps, comments
+  raw_materials/audio/    audio-only exports if you already have them
+
+This folder is in .gitignore. It will not be pushed to GitHub.
+
+Step 2 — For YouTube links
+
+Create or edit:
+
+  Research/ConfluenceResearch/raw_materials/notes/video_sources.md
+
+For each video, paste:
+
+  - title or creator
+  - URL
+  - why it matters
+  - important timestamps if you know them
+  - whether chart drawings are load-bearing
+
+Example:
+
+  ## Creator - Video Title
+  URL: https://youtube.com/...
+  Important: 12:30 liquidity sweep; 28:10 FVG entry model; 41:00 invalidation.
+  Notes: mostly chart markup, need screenshots.
+
+Step 3 — For raw videos
+
+Just drop the video file into:
+
+  raw_materials/videos/
+
+Later we can run a local pipeline:
+
+  video -> audio -> transcript -> keyframes -> OCR/screenshots -> processed markdown
+
+The processed markdown is what agents should read. Raw video stays local.
+
+Step 4 — For PDFs
+
+Drop PDFs into:
+
+  raw_materials/pdfs/
+
+If a PDF is public and not proprietary, also paste its source URL in:
+
+  raw_materials/notes/source_urls.md
+
+Step 5 — What Codex/Claude will produce
+
+For each source, agents should create:
+
+  processed/video_notes/<source_name>.md
+  processed/transcripts/<source_name>.txt      if transcript is useful
+  processed/screenshots/<source_name>/         selected chart examples only
+
+Each processed note should extract:
+
+  - concepts taught
+  - exact setup rules claimed
+  - chart examples with timestamps
+  - mechanical feature candidates
+  - entry/filter/exit/regime classification
+  - invalidation rules
+  - ambiguity / discretion still unresolved
+  - possible Pine or Python implementation
+  - ablation tests
+
+Step 6 — Keep the research honest
+
+Do not ask agents to "just code the ICT setup" from vague prose.
+The conversion standard is:
+
+  discretionary phrase -> measurable feature
+
+Examples:
+
+  "sweep liquidity" -> prior session high/low breached by >= N ticks and close back inside within M bars
+  "displacement" -> candle body >= X ATR and closes in top/bottom Y% of range
+  "FVG" -> three-candle gap between high[2] and low[0], width >= X ticks or ATR fraction
+  "order block" -> last opposite candle before displacement, retest within N bars, invalidation beyond block extreme
+  "killzone" -> fixed session window in exchange timezone
+  "absorption" -> high traded volume/delta against level without price continuation
+
+Step 7 — Next agent command
+
+After you add material, tell Codex or Claude:
+
+  "Process the new ConfluenceResearch raw materials and update the feature library."
+
+They should not read every raw file into context. They should create compact processed artifacts first.
