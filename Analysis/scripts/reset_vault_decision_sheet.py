@@ -27,7 +27,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from src.pipeline.monte_carlo import run_monte_carlo
 from src.rules.lucidflex import LucidFlex50K
-from src.rules.topstep import TopStepNoFee50K, TopStepPayoutPath
+from src.rules.topstep import TopStepPayoutPath
 from src.sizing.dynamic import AdaptiveSizing, FixedSizing
 from src.strategies.parametric import StateAwareBernoulliStrategy
 

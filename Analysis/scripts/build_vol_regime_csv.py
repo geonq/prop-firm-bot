@@ -22,7 +22,6 @@ import argparse
 import csv
 import json
 import math
-import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, time, timezone

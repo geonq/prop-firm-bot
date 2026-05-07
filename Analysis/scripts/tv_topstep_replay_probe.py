@@ -12,13 +12,17 @@ import argparse
 import csv
 import sys
 from collections.abc import Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.data.tv_trade_loader import load_tv_strategy_replay_days_xlsx
+from src.pipeline.replay_validation import (
+    ReplayDistributionStats as ReplayStats,
+    compute_replay_distribution_stats,
+)
 from src.pipeline.topstep_pipeline import TopStepPipelineResult
 from src.pipeline.topstep_replay import simulate_topstep_trade_replay
 from src.rules.topstep import TopStepPayoutPath
@@ -34,19 +38,6 @@ PROFILE4_DEFAULT_ADAPTIVE_SIZING = AdaptiveSizing(
     buffer_floor=0.25,
     post_payout_shrink=1.0,
 )
-
-
-@dataclass(frozen=True)
-class ReplayStats:
-    trades: int
-    replay_days: int
-    trading_days: int
-    win_rate: float
-    avg_win_loss_ratio: float
-    trades_per_replay_day: float
-    trades_per_trading_day: float
-    lag10_outcome_autocorr: float
-    inside_profile4: bool
 
 
 @dataclass(frozen=True)
@@ -149,53 +140,10 @@ def load_and_run_probe(
 
 
 def compute_replay_stats(replay_days: Sequence[ReplayDay]) -> ReplayStats:
-    r_multiples = [r for day in replay_days for r in day.r_multiples]
-    if not r_multiples:
+    stats = compute_replay_distribution_stats(tuple(replay_days))
+    if stats.trades == 0:
         raise ValueError("replay contains no trades")
-    wins = [r for r in r_multiples if r > 0]
-    losses = [r for r in r_multiples if r < 0]
-    trading_days = sum(1 for day in replay_days if day.r_multiples)
-    avg_win = sum(wins) / len(wins) if wins else 0.0
-    avg_loss = abs(sum(losses) / len(losses)) if losses else 0.0
-    avg_win_loss_ratio = avg_win / avg_loss if avg_loss else float("inf")
-    win_rate = len(wins) / len(r_multiples)
-    stats = ReplayStats(
-        trades=len(r_multiples),
-        replay_days=len(replay_days),
-        trading_days=trading_days,
-        win_rate=win_rate,
-        avg_win_loss_ratio=avg_win_loss_ratio,
-        trades_per_replay_day=len(r_multiples) / len(replay_days),
-        trades_per_trading_day=len(r_multiples) / trading_days if trading_days else 0.0,
-        lag10_outcome_autocorr=_outcome_autocorr(r_multiples, lag=10),
-        inside_profile4=False,
-    )
-    return replace(stats, inside_profile4=_inside_profile4(stats))
-
-
-def _outcome_autocorr(r_multiples: Sequence[float], *, lag: int) -> float:
-    outcomes = [1.0 if r > 0 else 0.0 for r in r_multiples if r != 0]
-    if len(outcomes) <= lag:
-        return 0.0
-    x = outcomes[:-lag]
-    y = outcomes[lag:]
-    mean_x = sum(x) / len(x)
-    mean_y = sum(y) / len(y)
-    cov = sum((a - mean_x) * (b - mean_y) for a, b in zip(x, y, strict=True))
-    var_x = sum((a - mean_x) ** 2 for a in x)
-    var_y = sum((b - mean_y) ** 2 for b in y)
-    if var_x == 0 or var_y == 0:
-        return 0.0
-    return cov / (var_x * var_y) ** 0.5
-
-
-def _inside_profile4(stats: ReplayStats) -> bool:
-    return (
-        0.40 <= stats.win_rate <= 0.50
-        and 1.7 <= stats.avg_win_loss_ratio <= 2.3
-        and 2.0 <= stats.trades_per_replay_day <= 4.0
-        and stats.lag10_outcome_autocorr <= 0.3
-    )
+    return stats
 
 
 def _print_result(result: TopStepReplayProbeResult) -> None:

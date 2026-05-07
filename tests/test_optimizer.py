@@ -1,9 +1,7 @@
-import random
-
 from src.optimizer.search import search_adaptive_grid
 from src.pipeline.lucidflex_pipeline import simulate_lucidflex_pipeline
 from src.rules.topstep import TopStepPayoutPath
-from src.sizing.dynamic import AdaptiveSizing, FixedSizing, SizingContext
+from src.sizing.dynamic import FixedSizing, SizingContext
 from src.strategies.parametric import StateAwareBernoulliStrategy
 
 
