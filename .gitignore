@@ -63,4 +63,7 @@ final_strategy/
 # Research intake raw materials — keep large/private videos, PDFs, transcripts,
 # screenshots, and downloaded course material local only.
 Research/ConfluenceResearch/raw_materials/
-Research/StrategyCapture/*/screenshots/
+Research/StrategyCapture/
+!Research/StrategyCapture/
+Research/StrategyCapture/*
+!Research/StrategyCapture/README.md

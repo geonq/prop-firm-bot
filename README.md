@@ -31,8 +31,7 @@ Prop Firm Bot/
 │   ├── CHANGELOG.md           # append-only history
 │   └── DECISIONS.md           # settled decisions
 ├── Research/                  # Current strategy research surface
-│   ├── StrategyCapture/       # Georg's discretionary model capture comes first
-│   │   └── georg_model_v1/    # screenshots ignored, processed notes/specs tracked
+│   ├── StrategyCapture/       # private model capture; model folders are ignored
 │   └── ConfluenceResearch/    # papers, ICT, order-flow feature research
 │       ├── raw_materials/     # ignored: videos, PDFs, screenshots, course material
 │       ├── processed/         # tracked compact notes/transcripts/screenshots
@@ -59,7 +58,7 @@ Prop Firm Bot/
 
 ## Current Research Flow
 
-1. **Capture Georg's strategy first.** Use `Research/StrategyCapture/georg_model_v1/` for screenshots and processed notes. The goal is to mechanize clean/choppy selection, liquidity draw, entry, invalidation, and target logic.
+1. **Capture Georg's strategy first.** Use an ignored local folder under `Research/StrategyCapture/` for screenshots and processed notes. The goal is to mechanize clean/choppy selection, liquidity draw, entry, invalidation, and target logic. Do not commit model details.
 2. **Simulate the rough model.** Compare against the attractive target geometry Georg described: about 10% WR, 10R average, $200 fixed risk.
 3. **Then deepen research.** Use `Research/ConfluenceResearch/` for papers, ICT videos, and order-flow ideas. Raw videos/PDFs stay ignored; processed notes and candidate specs are tracked.
 4. **Promote only through validation.** Candidate specs need ablations and a predeclared IS/OOS split before coding or TradingView exports.
