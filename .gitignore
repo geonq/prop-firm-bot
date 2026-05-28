@@ -38,12 +38,18 @@ service-account*.json
 *.secret
 *.credentials
 
-# Claude-specific context files — never push to repo
+# Claude/Codex agent context files — never push to repo
 CLAUDE.md
 REFERENCE.md
+AGENTS.md
+PROJECT_CONTEXT.md
+TV_EXPORT_PROTOCOL.txt
 .claude/
 .claude.json
 Tasks/todo.md
+
+# Coordination files — contain strategy mechanics and session state
+Coordination/
 
 # Proprietary trading strategy artifacts — never push to repo
 # (the prop firm rule encoding stays public; the actual strategy stays private)
