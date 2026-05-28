@@ -9,3 +9,4 @@ openpyxl
 pyarrow
 databento
 python-dotenv
+websocket-client
