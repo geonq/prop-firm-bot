@@ -46,6 +46,7 @@ DEFAULT_DOWNLOAD_DIR = PROJECT_ROOT / "TVExports"
 DEFAULT_PINE_DIR = PROJECT_ROOT / "PineScripts"
 DEFAULT_FROM_DATE = "2000-01-01"
 DEFAULT_WAIT_SECONDS = 120
+DEFAULT_POST_ADD_WAIT_SECONDS = 60
 DEFAULT_UI_TIMEOUT = 90
 PARTIAL_SUFFIXES = (".crdownload", ".download", ".tmp")
 META_MODIFIER = 4
@@ -55,6 +56,7 @@ DEFAULT_GUI_STRATEGY_TESTER_TAB = (300, 850)
 DEFAULT_CDP_PINE_TAB = (160, 850)
 DEFAULT_CDP_EDITOR = (600, 650)
 DEFAULT_CDP_STRATEGY_TESTER_TAB = (300, 850)
+DEFAULT_CDP_ADD_TO_CHART = (1280, 525)
 
 
 class TradingViewAutomationError(RuntimeError):
@@ -342,6 +344,12 @@ def dispatch_shortcut(client: CdpClient, key: str, code: str) -> None:
     client.call("Input.dispatchKeyEvent", {"type": "keyUp", **params})
 
 
+def dispatch_key(client: CdpClient, key: str, code: str) -> None:
+    params = {"key": key, "code": code}
+    client.call("Input.dispatchKeyEvent", {"type": "keyDown", **params})
+    client.call("Input.dispatchKeyEvent", {"type": "keyUp", **params})
+
+
 def cdp_click(client: CdpClient, x: int, y: int) -> None:
     client.call("Input.dispatchMouseEvent", {"type": "mouseMoved", "x": x, "y": y})
     client.call("Input.dispatchMouseEvent", {"type": "mousePressed", "x": x, "y": y, "button": "left", "clickCount": 1})
@@ -381,11 +389,18 @@ def query_click_script(needles: list[str]) -> str:
     const style = window.getComputedStyle?.(node);
     return rect && rect.width > 0 && rect.height > 0 && style && style.visibility !== 'hidden';
   }};
-  const el = nodes.find((node) => {{
+  const matches = nodes.filter((node) => {{
+    if (['HTML', 'BODY'].includes(node.tagName)) return false;
     if (!visible(node)) return false;
     const haystack = textOf(node).toLowerCase();
     return needles.some((needle) => haystack.includes(needle));
   }});
+  matches.sort((a, b) => {{
+    const ar = a.getBoundingClientRect();
+    const br = b.getBoundingClientRect();
+    return (ar.width * ar.height) - (br.width * br.height);
+  }});
+  const el = matches[0];
   if (!el) return {{ok: false, needles}};
   const rect = el.getBoundingClientRect();
   el.click();
@@ -404,8 +419,51 @@ def click_by_text(client: CdpClient, needles: list[str]) -> dict[str, Any]:
     return result if isinstance(result, dict) else {"ok": False, "result": result}
 
 
+def close_date_picker_overlay(client: CdpClient) -> dict[str, Any]:
+    script = r"""
+(() => {
+  const nodes = [];
+  const visit = (root) => {
+    if (!root) return;
+    if (root.querySelectorAll) {
+      for (const node of root.querySelectorAll('button,[role=button],[data-name],div')) {
+        nodes.push(node);
+        if (node.shadowRoot) visit(node.shadowRoot);
+      }
+    }
+  };
+  visit(document);
+  const textOf = (node) => (
+    node.innerText ||
+    node.textContent ||
+    node.getAttribute?.('aria-label') ||
+    node.getAttribute?.('title') ||
+    node.getAttribute?.('data-name') ||
+    ''
+  ).trim();
+  const visible = (node) => {
+    const rect = node.getBoundingClientRect?.();
+    const style = window.getComputedStyle?.(node);
+    return rect && rect.width > 0 && rect.height > 0 && style && style.visibility !== 'hidden';
+  };
+  const matches = nodes
+    .filter(visible)
+    .map((node) => ({node, text: textOf(node), rect: node.getBoundingClientRect()}))
+    .filter((item) => item.text.toLowerCase() === 'menü schließen' || item.text.toLowerCase() === 'close menu');
+  matches.sort((a, b) => (a.rect.width * a.rect.height) - (b.rect.width * b.rect.height));
+  const picked = matches[0];
+  if (!picked) return {ok: true, stage: 'not_present'};
+  picked.node.click();
+  return {ok: true, stage: 'closed', text: picked.text, rect: [picked.rect.x, picked.rect.y, picked.rect.width, picked.rect.height]};
+})()
+"""
+    result = evaluate(client, script)
+    time.sleep(0.5)
+    return result if isinstance(result, dict) else {"ok": False, "result": result}
+
+
 def focus_pine_editor(client: CdpClient) -> dict[str, Any]:
-    click_by_text(client, ["pine editor", "pine-editor", "pine-editor-tab", "pine-editor"])
+    click_by_text(client, ["pine editor", "pine-editor", "pine-editor-tab"])
     time.sleep(0.5)
     script = r"""
 (() => {
@@ -466,10 +524,12 @@ def paste_pine_source(client: CdpClient, pine_path: Path, *, pine_tab: tuple[int
     return {"ok": True, "pine": str(pine_path), "chars": len(pine_source), "focus": focus_result}
 
 
-def add_strategy_to_chart(client: CdpClient, *, timeout_seconds: int = 30) -> dict[str, Any]:
+def add_strategy_to_chart(client: CdpClient, *, timeout_seconds: int = 30, add_button: tuple[int, int]) -> dict[str, Any]:
     deadline = time.monotonic() + timeout_seconds
     needles = [
         "add to chart",
+        "update on chart",
+        "auf dem chart aktualisieren",
         "zum chart hinzufügen",
         "auf chart anwenden",
         "add strategy",
@@ -482,7 +542,108 @@ def add_strategy_to_chart(client: CdpClient, *, timeout_seconds: int = 30) -> di
             return last_result
         dispatch_shortcut(client, "Enter", "Enter")
         time.sleep(2)
-    raise TradingViewAutomationError(f"Could not add Pine strategy to chart: {json.dumps(last_result)[:3000]}")
+    cdp_click(client, *add_button)
+    time.sleep(5)
+    return {"ok": True, "stage": "coordinate_fallback", "add_button": add_button, "last_dom_result": last_result}
+
+
+def open_strategy_report(client: CdpClient, *, timeout_seconds: int = 60) -> dict[str, Any]:
+    script = r"""
+(() => {
+  const textOf = (node) => (
+    node.innerText ||
+    node.textContent ||
+    node.getAttribute?.('aria-label') ||
+    node.getAttribute?.('title') ||
+    ''
+  ).trim();
+  const visible = (node) => {
+    const rect = node.getBoundingClientRect?.();
+    const style = window.getComputedStyle?.(node);
+    return rect && rect.width > 0 && rect.height > 0 && style && style.visibility !== 'hidden';
+  };
+  const buttons = [...document.querySelectorAll('button,[role=button],a,[data-name]')].filter(visible);
+  const reportOpen = buttons.find((node) => {
+    const text = textOf(node).toLowerCase();
+    return (
+      text.includes('strategiebericht schließen') ||
+      text.includes('strategy report close') ||
+      /[0-9]{4}.*[—-].*[0-9]{4}/.test(text) ||
+      /[0-9]{1,2}\..*[0-9]{4}/.test(text)
+    );
+  });
+  if (reportOpen) return {ok: true, stage: 'already_open', text: textOf(reportOpen).slice(0, 160)};
+  const reportButton = buttons.find((node) => {
+    const text = textOf(node).toLowerCase();
+    return (
+      text.includes('bericht generieren') ||
+      text.includes('strategy report') ||
+      text.includes('generate report')
+    );
+  });
+  if (!reportButton) {
+    return {
+      ok: false,
+      stage: 'report_button_not_found',
+      controls: buttons.map((node) => textOf(node).slice(0, 100)).filter(Boolean).slice(-100),
+    };
+  }
+  const rect = reportButton.getBoundingClientRect();
+  reportButton.click();
+  return {ok: false, stage: 'clicked_report_button', text: textOf(reportButton), rect: [rect.x, rect.y, rect.width, rect.height]};
+})()
+"""
+    deadline = time.monotonic() + timeout_seconds
+    last_result: Any = None
+    while time.monotonic() < deadline:
+        last_result = evaluate(client, script)
+        if isinstance(last_result, dict) and last_result.get("ok"):
+            return last_result
+        time.sleep(2)
+    raise TradingViewAutomationError(f"Could not open Strategy Report: {json.dumps(last_result, ensure_ascii=False)[:3000]}")
+
+
+def open_date_range_picker(client: CdpClient, *, timeout_seconds: int = 30) -> dict[str, Any]:
+    script = r"""
+(() => {
+  const textOf = (node) => (
+    node.innerText ||
+    node.textContent ||
+    node.getAttribute?.('aria-label') ||
+    node.getAttribute?.('title') ||
+    ''
+  ).trim();
+  const visible = (node) => {
+    const rect = node.getBoundingClientRect?.();
+    const style = window.getComputedStyle?.(node);
+    return rect && rect.width > 0 && rect.height > 0 && style && style.visibility !== 'hidden';
+  };
+  const buttons = [...document.querySelectorAll('button,[role=button],a,[data-name]')].filter(visible);
+  const button = buttons.find((node) => {
+    const text = textOf(node);
+    return /[0-9]{4}.*[—-].*[0-9]{4}/.test(text) || /[0-9]{1,2}\..*[0-9]{4}/.test(text);
+  });
+  if (!button) {
+    return {
+      ok: false,
+      stage: 'date_range_button_not_found',
+      controls: buttons.map((node) => textOf(node).slice(0, 120)).filter(Boolean).slice(-120),
+    };
+  }
+  const rect = button.getBoundingClientRect();
+  button.click();
+  return {ok: true, text: textOf(button), rect: [rect.x, rect.y, rect.width, rect.height]};
+})()
+"""
+    deadline = time.monotonic() + timeout_seconds
+    last_result: Any = None
+    while time.monotonic() < deadline:
+        last_result = evaluate(client, script)
+        if isinstance(last_result, dict) and last_result.get("ok"):
+            time.sleep(1)
+            return last_result
+        time.sleep(1)
+    raise TradingViewAutomationError(f"Could not open date range picker: {json.dumps(last_result, ensure_ascii=False)[:3000]}")
 
 
 def set_backtest_start_date(client: CdpClient, from_date: str) -> dict[str, Any]:
@@ -490,6 +651,10 @@ def set_backtest_start_date(client: CdpClient, from_date: str) -> dict[str, Any]
         raise ValueError("from_date must be YYYY-MM-DD")
     click_by_text(client, ["strategy tester", "strategietester", "backtesting"])
     time.sleep(0.5)
+    open_strategy_report(client)
+    open_date_range_picker(client)
+    custom_result = click_by_text(client, ["benutzerdefinierter datumsbereich", "custom date range"])
+    time.sleep(0.8)
     script = f"""
 (() => {{
   const wanted = {json.dumps(from_date)};
@@ -537,20 +702,37 @@ def set_backtest_start_date(client: CdpClient, from_date: str) -> dict[str, Any]
         .slice(0, 50),
     }};
   }}
+  candidates.sort((a, b) => {{
+    const ar = a.getBoundingClientRect();
+    const br = b.getBoundingClientRect();
+    const score = (rect) => (
+      (rect.x > 450 && rect.x < 1000 ? 0 : 1000) +
+      (rect.y > 120 && rect.y < 420 ? 0 : 1000) +
+      rect.y
+    );
+    return score(ar) - score(br);
+  }});
   const input = candidates[0];
+  const rect = input.getBoundingClientRect();
   input.focus();
-  input.value = wanted;
+  input.select?.();
+  const valueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+  if (valueSetter) valueSetter.call(input, wanted);
+  else input.value = wanted;
   input.dispatchEvent(new Event('input', {{bubbles: true}}));
   input.dispatchEvent(new Event('change', {{bubbles: true}}));
-  input.blur();
   return {{
     ok: true,
     set: wanted,
+    value: input.value,
+    rect: [rect.x, rect.y, rect.width, rect.height],
     matched: {{
       type: input.type,
+      value: input.value,
       placeholder: input.placeholder,
       aria: input.getAttribute('aria-label'),
       title: input.getAttribute('title'),
+      className: String(input.className || '').slice(0, 120),
     }},
     candidates: candidates.length,
   }};
@@ -562,7 +744,103 @@ def set_backtest_start_date(client: CdpClient, from_date: str) -> dict[str, Any]
             "Could not set Strategy Tester start date. Open the Properties/date-range controls, "
             f"then retry. Details: {json.dumps(result, ensure_ascii=False)[:3000]}"
         )
-    return result
+    # The JS React-prototype setter already fired input/change events. Give React time to
+    # re-render before confirming — do not also paste via clipboard; double-setting conflicts
+    # when TV reformats on change (e.g. German locale shows "01.01.2000", not "2000-01-01").
+    time.sleep(0.4)
+    confirm_script = """
+(() => {
+  const active = document.activeElement;
+  return {
+    ok: !!active,
+    tag: active?.tagName,
+    type: active?.type,
+    value: active?.value,
+    aria: active?.getAttribute?.('aria-label'),
+    className: String(active?.className || '').slice(0, 120),
+  };
+})()
+"""
+    input_confirm = evaluate(client, confirm_script)
+    actual_value = input_confirm.get("value", "") if isinstance(input_confirm, dict) else ""
+    print(f"date_input_value={actual_value!r}  (requested {from_date})")
+    if not actual_value:
+        # Empty means the setter had no effect — raise before submitting garbage
+        raise TradingViewAutomationError(
+            f"Date input is empty after setting start date to {from_date}. "
+            f"Details: {json.dumps(input_confirm, ensure_ascii=False)[:2000]}"
+        )
+
+    submit_script = r"""
+(() => {
+  const nodes = [];
+  const visit = (root) => {
+    if (!root) return;
+    if (root.querySelectorAll) {
+      for (const node of root.querySelectorAll('button,[role=button],[data-name],div')) {
+        nodes.push(node);
+        if (node.shadowRoot) visit(node.shadowRoot);
+      }
+    }
+  };
+  visit(document);
+  const textOf = (node) => (
+    node.innerText ||
+    node.textContent ||
+    node.getAttribute?.('aria-label') ||
+    node.getAttribute?.('title') ||
+    node.getAttribute?.('data-name') ||
+    ''
+  ).trim();
+  const visible = (node) => {
+    const rect = node.getBoundingClientRect?.();
+    const style = window.getComputedStyle?.(node);
+    return rect && rect.width > 0 && rect.height > 0 && style && style.visibility !== 'hidden';
+  };
+  const candidates = nodes
+    .filter(visible)
+    .map((node) => ({node, text: textOf(node), rect: node.getBoundingClientRect()}))
+    .filter((item) => {
+      const text = item.text.toLowerCase();
+      const dataName = (item.node.getAttribute?.('data-name') || '').toLowerCase();
+      return dataName === 'submit-button' || text === 'auswählen' || text === 'select' || text === 'apply';
+    });
+  candidates.sort((a, b) => {
+    const ad = (a.node.getAttribute?.('data-name') || '').toLowerCase() === 'submit-button' ? 0 : 1;
+    const bd = (b.node.getAttribute?.('data-name') || '').toLowerCase() === 'submit-button' ? 0 : 1;
+    if (ad !== bd) return ad - bd;
+    return (a.rect.width * a.rect.height) - (b.rect.width * b.rect.height);
+  });
+  const picked = candidates[0];
+  if (!picked) {
+    return {
+      ok: false,
+      reason: 'submit_not_found',
+      controls: nodes.filter(visible).map((node) => textOf(node).slice(0, 80)).filter(Boolean).slice(-80),
+    };
+  }
+  picked.node.click();
+  return {ok: true, text: picked.text, rect: [picked.rect.x, picked.rect.y, picked.rect.width, picked.rect.height]};
+})()
+"""
+    submit_result = evaluate(client, submit_script)
+    if not isinstance(submit_result, dict) or not submit_result.get("ok"):
+        raise TradingViewAutomationError(
+            "Could not submit TradingView custom date range after setting the start date. "
+            f"Details: {json.dumps(submit_result, ensure_ascii=False)[:3000]}"
+        )
+    time.sleep(1)
+    close_result = close_date_picker_overlay(client)
+    time.sleep(2)
+    return {
+        "ok": True,
+        "requested": from_date,
+        "custom_range": custom_result,
+        "input": result,
+        "confirm": input_confirm,
+        "submit": submit_result,
+        "close": close_result,
+    }
 
 
 def open_strategy_tester(client: CdpClient, tester_tab: tuple[int, int]) -> None:
@@ -664,21 +942,38 @@ def set_download_behavior(client: CdpClient, download_dir: Path) -> None:
 
 
 def click_report_export(client: CdpClient, *, timeout_seconds: int = 60) -> dict[str, Any]:
+    dispatch_key(client, "Escape", "Escape")
+    time.sleep(0.5)
+    close_date_picker_overlay(client)
+    open_strategy_report(client, timeout_seconds=min(timeout_seconds, 30))
     script = r"""
 (() => {
   const textOf = (node) => (
     node.innerText ||
+    node.textContent ||
     node.getAttribute('aria-label') ||
     node.getAttribute('title') ||
+    node.getAttribute('data-name') ||
     ''
   ).trim();
-  const candidates = [...document.querySelectorAll('button,[role=button],a,[data-name]')];
+  const visible = (node) => {
+    const rect = node.getBoundingClientRect?.();
+    const style = window.getComputedStyle?.(node);
+    return rect && rect.width > 0 && rect.height > 0 && style && style.visibility !== 'hidden';
+  };
+  const candidates = [...document.querySelectorAll('button,[role=button],a,[data-name],div')].filter(visible);
   const clickFirst = (needles) => {
-    const el = candidates.find((node) => {
-    const text = textOf(node).toLowerCase();
+    const matches = candidates.filter((node) => {
+      const text = textOf(node).toLowerCase();
       const dataName = (node.getAttribute('data-name') || '').toLowerCase();
       return needles.some((needle) => text.includes(needle) || dataName.includes(needle));
     });
+    matches.sort((a, b) => {
+      const ar = a.getBoundingClientRect();
+      const br = b.getBoundingClientRect();
+      return (ar.width * ar.height) - (br.width * br.height);
+    });
+    const el = matches[0];
     if (!el) return null;
     const rect = el.getBoundingClientRect();
     el.click();
@@ -690,35 +985,56 @@ def click_report_export(client: CdpClient, *, timeout_seconds: int = 60) -> dict
   };
 
   const exportButton = clickFirst([
+    'daten als xlsx herunterladen',
+    'xlsx herunterladen',
+    'download xlsx',
+    'export xlsx',
+    'excel',
     'download csv',
     'csv herunterladen',
     'export csv',
+    'exportieren',
+    'export',
     'csv'
   ]);
   if (exportButton) {
     return {ok: true, stage: 'export_clicked', exportButton};
   }
 
-  const report = clickFirst([
-    'generate report',
-    'strategy report',
-    'bericht generieren',
-    'strategiebericht',
-    'report'
-  ]);
-  if (report) {
-    return {ok: false, stage: 'report_clicked', report};
+  // First pass: popup-menu triggers that look report/export related
+  let reportMenus = candidates.filter((node) => {
+    if (node.getAttribute('aria-haspopup') !== 'menu') return false;
+    const rect = node.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return false;
+    const dn = (node.getAttribute('data-name') || '').toLowerCase();
+    const al = (node.getAttribute('aria-label') || '').toLowerCase();
+    return dn.includes('report') || dn.includes('export') || dn.includes('more') ||
+           al.includes('report') || al.includes('export') || al.includes('more');
+  });
+  // Broader fallback: any visible popup-menu trigger (no hardcoded coordinates)
+  if (!reportMenus.length) {
+    reportMenus = candidates.filter((node) => {
+      const rect = node.getBoundingClientRect();
+      return node.getAttribute('aria-haspopup') === 'menu' && rect.width > 0 && rect.height > 0;
+    });
   }
-
-  const tester = clickFirst([
-    'strategy tester',
-    'strategietester',
-    'tester',
-    'backtesting',
-    'strategie'
-  ]);
-  if (tester) {
-    return {ok: false, stage: 'tester_clicked', tester};
+  reportMenus.sort((a, b) => {
+    const ar = a.getBoundingClientRect();
+    const br = b.getBoundingClientRect();
+    return (ar.width * ar.height) - (br.width * br.height);
+  });
+  const reportMenu = reportMenus[0];
+  if (reportMenu) {
+    const rect = reportMenu.getBoundingClientRect();
+    reportMenu.click();
+    return {
+      ok: false,
+      stage: 'report_context_menu_clicked',
+      menu: {
+        text: textOf(reportMenu),
+        rect: [rect.x, rect.y, rect.width, rect.height],
+      },
+    };
   }
 
   return {
@@ -799,6 +1115,7 @@ def csv_to_xlsx(csv_path: Path, *, output_path: Path | None = None) -> Path:
     output = safe_output_path(output)
     workbook = Workbook()
     worksheet = workbook.active
+    assert worksheet is not None
     worksheet.title = "Liste der Trades"
     with csv_path.open("r", encoding="utf-8-sig", newline="") as handle:
         reader = csv.reader(handle)
@@ -963,8 +1280,15 @@ def export_current_report(args: argparse.Namespace) -> ExportResult:
                 editor=args.cdp_editor,
             )
             print(json.dumps(paste_result, ensure_ascii=False, indent=2))
-            add_result = add_strategy_to_chart(client, timeout_seconds=args.add_timeout)
+            add_result = add_strategy_to_chart(
+                client,
+                timeout_seconds=args.add_timeout,
+                add_button=args.cdp_add_to_chart,
+            )
             print(json.dumps({"add_to_chart": add_result}, ensure_ascii=False, indent=2))
+            if args.post_add_wait_seconds > 0:
+                print(f"post_add_wait_seconds={args.post_add_wait_seconds}")
+                time.sleep(args.post_add_wait_seconds)
             if not args.skip_date:
                 open_strategy_tester(client, args.cdp_strategy_tester_tab)
                 date_result = set_backtest_start_date(client, args.from_date)
@@ -1017,6 +1341,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--setup-only", action="store_true", help="Paste/add/date setup, then stop before waiting/exporting")
     parser.add_argument("--from-date", default=DEFAULT_FROM_DATE)
     parser.add_argument("--skip-date", action="store_true", help="Do not try to set the Strategy Tester start date")
+    parser.add_argument(
+        "--post-add-wait-seconds",
+        type=int,
+        default=DEFAULT_POST_ADD_WAIT_SECONDS,
+        help="Wait after updating the strategy on chart before touching Strategy Tester dates",
+    )
     parser.add_argument("--wait-seconds", type=int, default=DEFAULT_WAIT_SECONDS)
     parser.add_argument("--output-prefix", help="Rename the downloaded report to this stem before conversion")
     parser.add_argument("--no-xlsx", action="store_true", help="Do not convert CSV exports to XLSX")
@@ -1032,6 +1362,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--download-timeout", type=int, default=180)
     parser.add_argument("--cdp-pine-tab", type=parse_xy, default=DEFAULT_CDP_PINE_TAB, help="Viewport coordinate X,Y for Pine Editor tab")
     parser.add_argument("--cdp-editor", type=parse_xy, default=DEFAULT_CDP_EDITOR, help="Viewport coordinate X,Y inside Pine Editor text area")
+    parser.add_argument("--cdp-add-to-chart", type=parse_xy, default=DEFAULT_CDP_ADD_TO_CHART, help="Viewport coordinate X,Y for Pine Editor Add/Update on chart button")
     parser.add_argument(
         "--cdp-strategy-tester-tab",
         type=parse_xy,
@@ -1056,7 +1387,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         result = export_current_report(args)
         print(json.dumps(result.click_result, ensure_ascii=False, indent=2))
-        print(f"csv={result.csv_path}")
+        print(f"download={result.csv_path}")
         if result.xlsx_path:
             count_, first, last = validate_xlsx(result.xlsx_path)
             print(f"xlsx={result.xlsx_path}")
