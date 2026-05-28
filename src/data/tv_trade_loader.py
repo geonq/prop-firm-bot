@@ -38,6 +38,8 @@ DEFAULT_PROFIT_COLUMNS = (
     "profit usd",
     "net profit",
     "net profit usd",
+    "net pnl",
+    "net pnl usd",
     "p&l",
     "pnl",
     "g&v netto",

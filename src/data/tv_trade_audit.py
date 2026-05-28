@@ -52,7 +52,7 @@ def load_tv_trade_records_xlsx(path: str | Path, *, sheet_name: str | None = Non
 
 def _records_from_rows(rows: list[tuple[Any, ...]]) -> list[TvTradeRecord]:
     header_index, headers = _find_trade_header(rows)
-    trade_index = _column_index(headers, requested=None, candidates=("trade #",), label="trade #")
+    trade_index = _column_index(headers, requested=None, candidates=("trade #", "trade number"), label="trade #")
     type_index = _column_index(headers, requested=None, candidates=("type", "typ"), label="trade type")
     time_index = _column_index(
         headers,
@@ -63,9 +63,9 @@ def _records_from_rows(rows: list[tuple[Any, ...]]) -> list[TvTradeRecord]:
     profit_index = _column_index(
         headers,
         requested=None,
-        candidates=("net profit", "net profit usd", "g&v netto", "g&v netto usd"),
+        candidates=("net profit", "net profit usd", "net pnl", "net pnl usd", "g&v netto", "g&v netto usd"),
         label="profit",
-        banned=("cum profit", "cumulative profit"),
+        banned=("cum profit", "cumulative profit", "cumulative pnl"),
     )
 
     grouped: dict[int, dict[str, Any]] = {}
@@ -103,7 +103,7 @@ def _find_trade_header(rows: list[tuple[Any, ...]]) -> tuple[int, list[str]]:
     for index, row in enumerate(rows[:40]):
         headers = ["" if cell is None else str(cell).strip() for cell in row]
         try:
-            _column_index(headers, requested=None, candidates=("trade #",), label="trade #")
+            _column_index(headers, requested=None, candidates=("trade #", "trade number"), label="trade #")
             _column_index(headers, requested=None, candidates=("type", "typ"), label="trade type")
             _column_index(
                 headers,
@@ -114,9 +114,9 @@ def _find_trade_header(rows: list[tuple[Any, ...]]) -> tuple[int, list[str]]:
             _column_index(
                 headers,
                 requested=None,
-                candidates=("net profit", "net profit usd", "g&v netto", "g&v netto usd"),
+                candidates=("net profit", "net profit usd", "net pnl", "net pnl usd", "g&v netto", "g&v netto usd"),
                 label="profit",
-                banned=("cum profit", "cumulative profit"),
+                banned=("cum profit", "cumulative profit", "cumulative pnl"),
             )
             return index, headers
         except ValueError:
