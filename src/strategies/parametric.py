@@ -12,9 +12,8 @@ from src.sizing.dynamic import SizingContext, SizingFunction
 class BernoulliTradeStrategy:
     """I.i.d. win/loss trade generator.
 
-    This is not a claim about real ORB profitability. It is a controlled proxy
-    for testing whether a trade distribution shape can survive a prop-firm
-    ruleset.
+    This is a controlled proxy for testing whether a trade distribution shape
+    can survive a prop-firm ruleset.
     """
 
     win_rate: float

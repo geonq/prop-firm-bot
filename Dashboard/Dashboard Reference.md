@@ -25,9 +25,9 @@ The dashboard should feel like a dense workbench, not a landing page:
 `Dashboard/app.py` is a research instrument:
 
 - evidence board for thesis status
-- L2 workbench for Databento summary and feature comparison
+- L2 workbench for Rithmic/Quantower summary and feature comparison
 - prop-firm probability view for synthetic LucidFlex phase-risk results
-- runbook for local research commands
+- runbook for the active order-flow data contract
 
 ## Visual Defaults
 

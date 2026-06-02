@@ -66,6 +66,10 @@ strategy_config.json
 strategy_config.yaml
 final_strategy/
 
+# Local archive payloads parked off main. The GitHub archive branch is `archived`;
+# private/raw payloads remain local-only.
+Archived/
+
 # Research intake raw materials — keep large/private videos, PDFs, transcripts,
 # screenshots, and downloaded course material local only.
 Research/ConfluenceResearch/raw_materials/

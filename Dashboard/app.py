@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 import sys
 
@@ -27,8 +26,7 @@ st.set_page_config(
 
 
 DEFAULT_SUMMARY_PATHS = (
-    ROOT / "Analysis/output/mbp10_batch/summary.csv",
-    ROOT / "Analysis/output/mbp10_batch_smoke/summary.csv",
+    ROOT / "Research/OrderFlowL2/summary.csv",
 )
 STANDARD_LUCID_EVAL_FEE = LucidFlex50K().eval_fee
 
@@ -73,11 +71,11 @@ ENGINE_PHASES = [
         "priority": 3,
     },
     {
-        "phase": "Phase 4 — Real-strategy validation",
-        "status": "pending",
-        "artifacts": "(none — no TV strategies feeding the engine yet)",
-        "done": "Replay loader scaffolding exists in src/strategies/replay.py and src/pipeline/lucidflex_replay.py for when trade exports arrive.",
-        "next": "Pick non-ORB candidates: vol-scaled TSMOM (Moskowitz/Ooi/Pedersen), opening-hour conditional momentum (Gao/Han/Li/Zhou), or VRP-gated trend. Backtest in TV, export, replay through engine.",
+        "phase": "Phase 4 — Order-flow / L2 research",
+        "status": "active",
+        "artifacts": "Research/OrderFlowL2/README.md",
+        "done": "Model A/Pine and prior paper/public-strategy attempts are parked. Main now focuses on objective depth/tape data.",
+        "next": "Capture or import NQ+ES Rithmic depth/tape data, then compute queue imbalance, OFI, delta, absorption, replenishment, and ES/NQ confirmation features.",
         "priority": 4,
     },
     {
@@ -85,15 +83,15 @@ ENGINE_PHASES = [
         "status": "partial",
         "artifacts": "Probability tab firm selector; cross-firm Sizing Lab; reset_economics.py",
         "done": "Probability and Sizing Lab run LucidFlex or TopStep. TopStep supports Standard/Consistency path, optional DLL, and Back2Funded retries. Reset-vs-fresh cost helper exists.",
-        "next": "Bayesian optimization, richer reset timing economics, and Phase 4 TradingView export replay.",
+        "next": "Bayesian optimization and richer reset timing economics after an L2-derived trade distribution exists.",
         "priority": 5,
     },
     {
-        "phase": "Parked — L2 microstructure research",
+        "phase": "Archived — TV/Pine and paper strategy search",
         "status": "parked",
-        "artifacts": "Analysis/2026-05-05_l2_event_study.md, Analysis/scripts/databento_l2_event_study.py, L2 Workbench tab",
-        "done": "Five Databento MBP-10 sessions tested across depth pressure, VWAP 2sd/3sd, vol shape, prior-gap regimes. Zero strict promotions.",
-        "next": "Not the operating thesis. Re-enter only after engine identifies a (WR, reward/risk, freq) cell that needs a microstructure-conditioned signal to live in.",
+        "artifacts": "GitHub branch `archived`; ignored local `Archived/` payloads",
+        "done": "Discretionary Model A automation, public Pine concepts, and paper-mined strategy attempts are no longer active on main.",
+        "next": "Re-open only if Georg explicitly requests a timeboxed falsification pass.",
         "priority": 6,
     },
 ]
@@ -523,220 +521,21 @@ def render_engine_overview() -> None:
             )
 
 
-def _load_strategy_registry() -> pd.DataFrame:
-    path = ROOT / "Analysis/output/tv_strategies/registry.parquet"
-    if not path.exists():
-        return pd.DataFrame()
-    return pd.read_parquet(path)
-
-
-def _load_mc_index() -> pd.DataFrame:
-    path = ROOT / "Analysis/output/mc_runs/index.parquet"
-    if not path.exists():
-        return pd.DataFrame()
-    return pd.read_parquet(path)
-
-
-def _load_strategy_meta(strategy_id: str) -> dict | None:
-    path = ROOT / f"Analysis/output/tv_strategies/{strategy_id}/meta.json"
-    if not path.exists():
-        return None
-    return json.loads(path.read_text())
-
-
-def _load_strategy_trades(strategy_id: str) -> pd.DataFrame:
-    path = ROOT / f"Analysis/output/tv_strategies/{strategy_id}/trades.parquet"
-    if not path.exists():
-        return pd.DataFrame()
-    return pd.read_parquet(path)
-
-
 def render_tv_strategies_tab() -> None:
-    st.subheader("TV Strategies & MC")
-    st.markdown(
-        '<div class="pf-note">Strategies ingested from <code>TVExports/</code>. '
-        "Screening uses the prop-firm-EV rubric (Sortino, profit factor, single-day "
-        "concentration, OOS status — failed accounts are acceptable; the goal is "
-        "long-run $/month, not real-market alpha). MC is sequential block-bootstrap "
-        "(start 2k, expand by 2k, cap 50k) — stops early when both eval-pass and EV "
-        "CIs are clearly on one side of their thresholds (20% pass, $0 EV). "
-        '<code>stopped_reason</code> tells you whether the cap was hit. To refresh: '
-        '<code>python Analysis/scripts/build_strategy_registry.py</code>.</div>',
-        unsafe_allow_html=True,
+    st.subheader("Archived TV/Pine Work")
+    st.info(
+        "TradingView/Pine strategy ingestion is parked. Tracked legacy files are on "
+        "the GitHub branch `archived`; private/raw artifacts remain in ignored local "
+        "`Archived/` folders. Main now expects candidate trades to come from the "
+        "order-flow/L2 research path."
     )
-
-    registry = _load_strategy_registry()
-    if registry.empty:
-        st.info(
-            "No strategies ingested yet. Drop xlsx exports into TVExports/ "
-            "and run `python Analysis/scripts/build_strategy_registry.py`."
-        )
-        return
-
-    mc = _load_mc_index()
-
-    # Registry table.
-    display = registry.copy()
-    display["net_pnl_fmt"] = display["net_pnl"].apply(money)
-    display["max_dd"] = display["max_drawdown_usd"].apply(money)
-    display["sortino"] = display["sortino_daily"].round(2)
-    display["pf"] = display["profit_factor"].round(2)
-    cols = [
-        "display_name",
-        "oos_role",
-        "screening_status",
-        "n_trades",
-        "date_start",
-        "date_end",
-        "net_pnl_fmt",
-        "max_dd",
-        "sortino",
-        "pf",
-        "screening_reasons",
-    ]
-    cols_present = [c for c in cols if c in display.columns]
-    st.markdown("**Strategy registry**")
-    st.dataframe(display[cols_present], use_container_width=True, hide_index=True)
-
-    st.markdown("---")
-
-    # Per-strategy drilldown.
-    options = registry[["strategy_id", "display_name"]].drop_duplicates()
-    options["label"] = options["display_name"] + " — " + options["strategy_id"].str[:8]
-    selected_label = st.selectbox("Inspect strategy", options["label"].tolist())
-    selected_id = options.loc[options["label"] == selected_label, "strategy_id"].iloc[0]
-
-    meta = _load_strategy_meta(selected_id)
-    if meta is None:
-        st.warning("meta.json not found for this strategy.")
-        return
-
-    detail_cols = st.columns([3, 2])
-    with detail_cols[0]:
-        st.markdown("**Stats**")
-        stats = meta["stats"]
-        stat_rows = pd.DataFrame(
-            {
-                "Metric": [
-                    "Trades",
-                    "Trading days",
-                    "Date range",
-                    "Net P&L (TV net)",
-                    "Win rate",
-                    "Profit factor",
-                    "Sharpe (daily, ann.)",
-                    "Sortino (daily, ann.)",
-                    "Max drawdown (USD)",
-                    "Max DD vs $50k",
-                    "Largest single day",
-                ],
-                "Value": [
-                    f"{stats['n_trades']:,}",
-                    f"{stats['n_trading_days']:,}",
-                    f"{stats['date_start']} → {stats['date_end']}",
-                    money(stats["net_pnl"]),
-                    pct(stats["win_rate"]),
-                    f"{stats['profit_factor']:.2f}",
-                    f"{stats['sharpe_daily']:.2f}",
-                    f"{stats['sortino_daily']:.2f}",
-                    money(stats["max_drawdown_usd"]),
-                    pct(stats["max_drawdown_pct"]),
-                    money(stats["max_single_day_pnl"]),
-                ],
-            }
-        )
-        st.dataframe(stat_rows, use_container_width=True, hide_index=True)
-    with detail_cols[1]:
-        st.markdown("**Screening verdict**")
-        screening = meta["screening"]
-        status = screening["status"]
-        color = {"PASS": "#1f9d55", "FAIL": "#cc1f1a", "OOS_PENDING": "#cc7c1f"}.get(status, "#888")
-        st.markdown(
-            f"<h2 style='color:{color}; margin-top:0'>{status}</h2>",
-            unsafe_allow_html=True,
-        )
-        if screening["reasons"]:
-            for r in screening["reasons"]:
-                st.markdown(f"- {r}")
-        else:
-            st.markdown("All pre-MC filters passed.")
-        with st.expander("Rubric thresholds"):
-            st.json(screening["rubric"])
-
-    st.markdown("---")
-
-    trades = _load_strategy_trades(selected_id)
-    if not trades.empty:
-        sorted_trades = trades.sort_values("exit_time").reset_index(drop=True)
-        sorted_trades["cum_pnl"] = sorted_trades["net_profit"].cumsum()
-        fig_eq = px.line(
-            sorted_trades,
-            x="exit_time",
-            y="cum_pnl",
-            title="Equity curve (cumulative TV net P&L)",
-        )
-        fig_eq.update_layout(height=320, margin=dict(l=0, r=0, t=40, b=0))
-        st.plotly_chart(fig_eq, use_container_width=True)
-
-        dist_cols = st.columns(2)
-        with dist_cols[0]:
-            fig_pnl = px.histogram(
-                trades, x="net_profit", nbins=80, title="Trade P&L distribution (USD)"
-            )
-            fig_pnl.update_layout(height=280, margin=dict(l=0, r=0, t=40, b=0))
-            st.plotly_chart(fig_pnl, use_container_width=True)
-        with dist_cols[1]:
-            fig_hold = px.histogram(
-                trades, x="hold_seconds", nbins=80, title="Hold time per trade (seconds)"
-            )
-            fig_hold.update_layout(height=280, margin=dict(l=0, r=0, t=40, b=0))
-            st.plotly_chart(fig_hold, use_container_width=True)
-
-    st.markdown("---")
-    st.markdown("**Monte Carlo Results — TopStep 50K + LucidFlex 50K**")
-    mc_for_strat = mc[mc["strategy_id"] == selected_id] if not mc.empty else pd.DataFrame()
-    if mc_for_strat.empty:
-        st.info(
-            "No MC runs for this strategy yet. Run "
-            "`python Analysis/scripts/build_strategy_registry.py`."
-        )
-    else:
-        mc_display = mc_for_strat.copy()
-        mc_display["eval_pass"] = mc_display.apply(
-            lambda r: f"{r['eval_pass_rate']*100:.1f}% "
-            f"[{r['eval_pass_ci_lo']*100:.1f}, {r['eval_pass_ci_hi']*100:.1f}]",
-            axis=1,
-        )
-        mc_display["mean_net_ev_fmt"] = mc_display.apply(
-            lambda r: f"{money(r['mean_net_ev'])}  "
-            f"95% [{money(r['ev_ci_lo'])}, {money(r['ev_ci_hi'])}]",
-            axis=1,
-        )
-        mc_display["funded_breach"] = mc_display["funded_breach_rate"].apply(pct)
-        mc_display["breach_after_pass"] = mc_display["funded_breach_after_pass_rate"].apply(pct)
-        mc_display["max_payout"] = mc_display["max_payout_rate"].apply(pct)
-        mc_cols = [
-            "firm",
-            "n_simulations",
-            "stopped_reason",
-            "block_size",
-            "eval_pass",
-            "funded_breach",
-            "breach_after_pass",
-            "max_payout",
-            "mean_payouts",
-            "mean_trader_payouts",
-            "mean_net_ev_fmt",
-        ]
-        mc_cols_present = [c for c in mc_cols if c in mc_display.columns]
-        st.dataframe(mc_display[mc_cols_present], use_container_width=True, hide_index=True)
 
 
 def render_l2_tab(summary_df: pd.DataFrame) -> None:
     st.subheader("L2 Evidence")
     if summary_df.empty:
         st.markdown(
-            '<div class="pf-note">No batch summary found yet. Run the MBP-10 batch report after downloads finish.</div>',
+            '<div class="pf-note">No L2 summary found yet. Capture or import Rithmic/Quantower depth and tape data first.</div>',
             unsafe_allow_html=True,
         )
         return
@@ -1133,21 +932,17 @@ def render_sizing_lab(firm: str, eval_fee: int) -> None:
 
 def render_runbook() -> None:
     st.subheader("Runbook")
-    st.code(
-        ".venv/bin/python Analysis/scripts/databento_mbp10_sample.py --download-job JOB_ID\n"
-        ".venv/bin/python Analysis/scripts/databento_mbp10_batch_report.py "
-        "TVExports/mbp10_sample --symbol MNQM6 --output-dir Analysis/output/mbp10_batch --overwrite",
-        language="zsh",
-    )
     st.markdown(
         """
-        **Pending Databento Jobs**
+        **Active data contract**
 
-        - `GLBX-20260501-9MYYFW877G`
-        - `GLBX-20260501-C53EPEATLB`
-        - `GLBX-20260501-N7KU43ME5X`
-        - `GLBX-20260501-BCRJXJXW8J`
-        - `GLBX-20260501-A7RU7JT4M5`
+        - Instruments: NQ and ES
+        - Feed: Rithmic preferred
+        - Platform: Quantower, R|Trader Pro, Sierra Chart, ATAS, Jigsaw, Bookmap, or equivalent
+        - Streams: trades/tape plus Level 2 depth
+        - Depth: top 10 levels minimum; MBO if available
+        - Timestamps: millisecond precision preferred
+        - First output: reproducible capture file plus a small summary CSV under `Research/OrderFlowL2/`
         """
     )
 
@@ -1196,10 +991,10 @@ def main() -> None:
     tab_engine, tab_strategies, tab_probability, tab_sizing, tab_l2, tab_runbook = st.tabs(
         [
             "Engine Overview",
-            "TV Strategies & MC",
+            "Archived TV/Pine",
             "Probability",
             "Sizing Lab",
-            "L2 Workbench (parked)",
+            "L2 Workbench",
             "Runbook",
         ]
     )
