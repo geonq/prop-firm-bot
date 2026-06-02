@@ -28,6 +28,24 @@ def test_load_tv_trade_records_pairs_german_entry_exit_rows(tmp_path: Path) -> N
     assert records[1].hold_seconds == 30
 
 
+def test_load_tv_trade_records_accepts_german_report_workbook_headers(tmp_path: Path) -> None:
+    xlsx_path = tmp_path / "tv_report.xlsx"
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = "Handelsgeschäfte"
+    worksheet.append(["Trade-Nummer", "Typ", "Datum und Uhrzeit", "Netto G&V USD"])
+    worksheet.append([1, "Long-Ausstieg", "2026-01-05 10:00:03", 100])
+    worksheet.append([1, "Long-Einstieg", "2026-01-05 10:00:00", 100])
+    workbook.save(xlsx_path)
+    workbook.close()
+
+    records = load_tv_trade_records_xlsx(xlsx_path)
+
+    assert len(records) == 1
+    assert records[0].trade_number == 1
+    assert records[0].net_profit == 100
+
+
 def test_tv_trade_records_feed_lucid_microscalping_guard(tmp_path: Path) -> None:
     xlsx_path = tmp_path / "tv_trades.xlsx"
     workbook = Workbook()
