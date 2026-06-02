@@ -29,7 +29,15 @@ class TvTradeRecord:
         return (self.exit_time - self.entry_time).total_seconds()
 
 
-def load_tv_trade_records_xlsx(path: str | Path, *, sheet_name: str | None = None) -> list[TvTradeRecord]:
+_MAX_REALISTIC_TRADE_PNL = 10_000.0  # abs(net_profit) cap — filters TradingView phantom open-position artifacts
+
+
+def load_tv_trade_records_xlsx(
+    path: str | Path,
+    *,
+    sheet_name: str | None = None,
+    max_abs_profit: float = _MAX_REALISTIC_TRADE_PNL,
+) -> list[TvTradeRecord]:
     """Load paired TradingView entry/exit rows into complete trade records."""
     workbook = load_workbook(Path(path), read_only=True, data_only=True)
     try:
@@ -40,7 +48,7 @@ def load_tv_trade_records_xlsx(path: str | Path, *, sheet_name: str | None = Non
                 raise ValueError(f"worksheet not found: {candidate_name}")
             worksheet = workbook[candidate_name]
             try:
-                return _records_from_rows(list(worksheet.iter_rows(values_only=True)))
+                return _records_from_rows(list(worksheet.iter_rows(values_only=True)), max_abs_profit=max_abs_profit)
             except _HeaderNotFound as exc:
                 last_error = exc
                 if sheet_name is not None:
@@ -50,7 +58,7 @@ def load_tv_trade_records_xlsx(path: str | Path, *, sheet_name: str | None = Non
         workbook.close()
 
 
-def _records_from_rows(rows: list[tuple[Any, ...]]) -> list[TvTradeRecord]:
+def _records_from_rows(rows: list[tuple[Any, ...]], *, max_abs_profit: float = _MAX_REALISTIC_TRADE_PNL) -> list[TvTradeRecord]:
     header_index, headers = _find_trade_header(rows)
     trade_index = _column_index(
         headers,
@@ -104,12 +112,15 @@ def _records_from_rows(rows: list[tuple[Any, ...]]) -> list[TvTradeRecord]:
     for trade_number in sorted(grouped):
         bucket = grouped[trade_number]
         if {"entry_time", "exit_time", "net_profit"} <= bucket.keys():
+            pnl = float(bucket["net_profit"])
+            if abs(pnl) > max_abs_profit:
+                continue
             records.append(
                 TvTradeRecord(
                     trade_number=trade_number,
                     entry_time=bucket["entry_time"],
                     exit_time=bucket["exit_time"],
-                    net_profit=float(bucket["net_profit"]),
+                    net_profit=pnl,
                 )
             )
     return records

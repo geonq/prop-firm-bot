@@ -66,6 +66,15 @@ strategy_config.json
 strategy_config.yaml
 final_strategy/
 
+# Local archive payloads that must not be published even when archive folders exist.
+Archived/**/.DS_Store
+Archived/my_strategy/PineScripts/
+Archived/my_strategy/TVExports/
+Archived/my_strategy/Research/StrategyCapture/*/
+Archived/other_strats_research/PineScripts/
+Archived/other_strats_research/TVExports/
+Archived/other_strats_research/Analysis/output/
+
 # Research intake raw materials — keep large/private videos, PDFs, transcripts,
 # screenshots, and downloaded course material local only.
 Research/ConfluenceResearch/raw_materials/
