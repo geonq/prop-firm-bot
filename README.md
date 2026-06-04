@@ -1,38 +1,41 @@
 # Prop Firm Bot
 
-Monte Carlo engine for prop-firm account economics plus a new order-flow/L2 research track.
+Monte Carlo engine for prop-firm account economics.
 
-**Current phase:** Phase 4 pivot — Rithmic/Quantower order-flow data capture and measurable L2 feature research.
+**Current phase:** Parked. This was a foundational project, not a failed one. It built the rule engine and, more importantly, exposed the real limitation: the hard part was never getting Claude/Codex to produce more code, it was having a mechanical edge that Georg understood deeply enough to express, validate, and maintain himself.
 
-## Current Direction
+Georg is now moving into a more in-depth path: studying the market mechanics and quantitative foundations more seriously, then likely rebuilding the next version from scratch with his own code instead of relying on agents for the core implementation.
+
+## Parked State
 
 The core engine stays: model prop-firm accounts as structured products, then evaluate whether a trade distribution survives eval, funded, payout, and breach rules.
 
-The old strategy path is parked:
+What this project clarified:
+
+- Prop-firm accounts can be modeled as structured products with exact state machines.
+- The engine, rulesets, replay, sizing, and Monte Carlo layers are useful reusable foundations.
+- The weak point was strategy definition: discretionary SMT, daily bias, clean/choppy reads, liquidity draws, and no-trade selection were not objective enough to automate honestly.
+- Agent-generated code can accelerate scaffolding, but it cannot replace Georg's own market understanding or ownership of the implementation.
+- The next serious attempt should start from direct understanding, smaller scope, and code Georg can reason about line by line.
+
+The strategy path is parked:
 
 - Georg's discretionary Model A / SMT / OTE / CISD automation attempt is parked.
 - Prior paper-mining and public Pine strategy attempts are parked.
 - TradingView/Pine export tooling is parked.
-
-The active strategy-research path is now objective order-flow/L2 data:
-
-- NQ and ES market depth
-- tape/trade prints
-- queue imbalance
-- order-flow imbalance
-- absorption and depth replenishment
-- ES/NQ confirmation
-- prop-firm replay of any resulting signal distribution
+- Rithmic/Quantower order-flow/L2 research is parked as a future path, not active repo work.
 
 Archived tracked work lives on the GitHub branch `archived`. Private raw artifacts remain local-only under ignored archive folders.
+
+Return condition: resume this project only when there is one mechanical entry rule with a live sample of at least 30 trades that plausibly fits the target prop-firm geometry: 40-50% win rate, reward/risk at least 2.0, and roughly 2-4 trades per day.
 
 ## Scope
 
 - **Rulesets:** LucidFlex 50K, TopStep 50K No-Fee
 - **Engine:** eval → funded → payouts → breach simulation
 - **Sizing:** fixed, buffer-aware, adaptive
-- **Research focus:** Rithmic/Quantower L2 data capture and feature validation
-- **Out of active scope:** discretionary SMT automation, published-concept Pine strategies, TradingView export automation
+- **Research status:** parked until a mechanical signal is ready for replay
+- **Out of active scope:** discretionary SMT automation, published-concept Pine strategies, TradingView export automation, active L2/order-flow buildout
 
 ## Folder Guide
 
@@ -46,7 +49,7 @@ Prop Firm Bot/
 │   ├── optimizer/       # parameter grid search + reset economics
 │   └── data/            # generic replay data loading
 ├── Research/
-│   └── OrderFlowL2/     # active Rithmic/Quantower data-capture plan
+│   └── OrderFlowL2/     # parked future Rithmic/Quantower data-capture plan
 ├── Rulesets/            # official prop firm rule summaries
 ├── Dashboard/           # Streamlit MC dashboard
 └── Archived/            # ignored local archive payloads; GitHub branch: archived
@@ -80,6 +83,6 @@ pytest tests/
 | 1 — Ruleset encoding | Done |
 | 2 — Account state machines + single pipeline | Done |
 | 3 — Parametric MC + dynamic sizing | Done |
-| 4 — Strategy research | Pivoted to order-flow/L2 |
-| 5 — Optimizer + dashboard refinement | Pending |
-| 6 — Live execution bot | Pending |
+| 4 — Strategy research | Parked |
+| 5 — Optimizer + dashboard refinement | Parked |
+| 6 — Live execution bot | Parked |
