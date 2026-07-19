@@ -47,6 +47,7 @@ actually matters in practice.
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 import traceback
@@ -620,7 +621,7 @@ class ProcessLockHeld(RuntimeError):
 
 
 class ProcessLock:
-    """Exclusive, non-blocking, process-lifetime lock via fcntl.flock on
+    """Exclusive, non-blocking, process-lifetime advisory lock on
     LiveState/orbbot.lock (reviewer Fix 1, 2026-07-19, CRITICAL -- launchd's
     two StartCalendarInterval entries (14:20 and 15:20 local) can both land
     inside the 09:25-11:40 ET trading window on a normal week (e.g.
@@ -631,8 +632,9 @@ class ProcessLock:
     would then independently decide "should run today" and BOTH place a
     real entry, doubling the position with no lock anywhere to stop it.
 
-    `acquire()` uses `fcntl.flock(LOCK_EX | LOCK_NB)` -- non-blocking, so a
-    second process gets an immediate failure rather than queuing behind the
+    `acquire()` uses the native non-blocking file-lock primitive --
+    ``fcntl.flock`` on POSIX and ``msvcrt.locking`` on Windows -- so a second
+    process gets an immediate failure rather than queuing behind the
     first (queuing would just delay the double-entry, not prevent it, since
     the second process would then proceed once the first exits). The lock
     is held for the ENTIRE process lifetime (acquired once at the start of
@@ -641,9 +643,9 @@ class ProcessLock:
     the entry: two processes both polling/managing exits for what they each
     believe is "their" position would be equally unsafe.
 
-    POSIX-only (fcntl) -- matches the project's own "Mac only, no VPS"
-    deployment constraint (Tasks/todo.md "Phase 6B": personal-device
-    requirement is policy).
+    The implementation is deliberately limited to local personal-device
+    execution. It supports both macOS/Linux and the Windows Hermes PC; it is
+    not a distributed lock and must not be treated as one.
     """
 
     def __init__(self, path: Path) -> None:
@@ -658,12 +660,26 @@ class ProcessLock:
         an error condition. Only raises for a genuine filesystem problem
         (permissions, missing parent dir, etc.).
         """
-        import fcntl
-
         self.path.parent.mkdir(parents=True, exist_ok=True)
         fh = self.path.open("a+")
         try:
-            fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            if os.name == "nt":
+                # Windows locks byte ranges rather than whole files. Ensure
+                # byte zero exists, then lock exactly that byte without
+                # waiting. ``a+`` is intentional: it also creates the lock
+                # file atomically when it does not yet exist.
+                import msvcrt
+
+                fh.seek(0, 2)
+                if fh.tell() == 0:
+                    fh.write("\0")
+                    fh.flush()
+                fh.seek(0)
+                msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError:
             fh.close()
             return False
@@ -676,10 +692,16 @@ class ProcessLock:
 
     def release(self) -> None:
         if self._fh is not None:
-            import fcntl
-
             try:
-                fcntl.flock(self._fh.fileno(), fcntl.LOCK_UN)
+                if os.name == "nt":
+                    import msvcrt
+
+                    self._fh.seek(0)
+                    msvcrt.locking(self._fh.fileno(), msvcrt.LK_UNLCK, 1)
+                else:
+                    import fcntl
+
+                    fcntl.flock(self._fh.fileno(), fcntl.LOCK_UN)
             finally:
                 self._fh.close()
                 self._fh = None
