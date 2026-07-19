@@ -10,9 +10,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from src.pipeline.apex_pipeline import ApexPipelineResult, simulate_apex_pipeline
 from src.pipeline.lucidflex_pipeline import LucidFlexPipelineResult, simulate_lucidflex_pipeline
 from src.pipeline.monte_carlo import FirmName, MonteCarloResult, Strategy, run_monte_carlo
 from src.pipeline.topstep_pipeline import TopStepPipelineResult, simulate_topstep_pipeline
+from src.rules.apex import Apex50K
 from src.rules.lucidflex import LucidFlex50K
 from src.rules.topstep import TopStepNoFee50K, TopStepPayoutPath
 
@@ -25,12 +27,14 @@ class SimulationConfig:
     topstep_payout_path: TopStepPayoutPath = TopStepPayoutPath.STANDARD
     topstep_use_daily_loss_limit: bool = False
     topstep_max_back2funded_reactivations: int = 0
+    apex_ruleset: Apex50K | None = None
+    apex_drawdown_variant: str = "eod"
     max_eval_days: int = 90
     max_funded_days: int = 180
     payout_cap: int | None = None
 
 
-PipelineResult = LucidFlexPipelineResult | TopStepPipelineResult
+PipelineResult = LucidFlexPipelineResult | TopStepPipelineResult | ApexPipelineResult
 
 
 def simulate_one(
@@ -63,6 +67,17 @@ def simulate_one(
             max_back2funded_reactivations=config.topstep_max_back2funded_reactivations,
         )
 
+    if config.firm == "apex":
+        return simulate_apex_pipeline(
+            strategy,
+            ruleset=config.apex_ruleset,
+            drawdown_variant=config.apex_drawdown_variant,
+            seed=seed,
+            max_eval_days=config.max_eval_days,
+            max_funded_days=config.max_funded_days,
+            payout_cap=config.payout_cap,
+        )
+
     raise ValueError(f"unknown firm: {config.firm}")
 
 
@@ -85,6 +100,8 @@ def simulate_many(
         topstep_payout_path=config.topstep_payout_path,
         topstep_use_daily_loss_limit=config.topstep_use_daily_loss_limit,
         topstep_max_back2funded_reactivations=config.topstep_max_back2funded_reactivations,
+        apex_ruleset=config.apex_ruleset,
+        apex_drawdown_variant=config.apex_drawdown_variant,
         max_eval_days=config.max_eval_days,
         max_funded_days=config.max_funded_days,
         payout_cap=config.payout_cap,
@@ -100,6 +117,8 @@ def _validate_config(config: SimulationConfig) -> None:
         raise ValueError("payout_cap must be positive when provided")
     if config.topstep_max_back2funded_reactivations < 0:
         raise ValueError("topstep_max_back2funded_reactivations must be non-negative")
+    if config.apex_drawdown_variant not in {"eod", "intraday"}:
+        raise ValueError("apex_drawdown_variant must be 'eod' or 'intraday'")
 
     if config.firm == "lucidflex":
         if config.topstep_ruleset is not None:
@@ -112,11 +131,28 @@ def _validate_config(config: SimulationConfig) -> None:
             raise ValueError("topstep_max_back2funded_reactivations is invalid for LucidFlex")
         if config.payout_cap is not None:
             raise ValueError("payout_cap is invalid for LucidFlex")
+        if config.apex_ruleset is not None:
+            raise ValueError("apex_ruleset is invalid for LucidFlex")
         return
 
     if config.firm == "topstep":
         if config.lucidflex_ruleset is not None:
             raise ValueError("lucidflex_ruleset is invalid for TopStep")
+        if config.apex_ruleset is not None:
+            raise ValueError("apex_ruleset is invalid for TopStep")
+        return
+
+    if config.firm == "apex":
+        if config.lucidflex_ruleset is not None:
+            raise ValueError("lucidflex_ruleset is invalid for Apex")
+        if config.topstep_ruleset is not None:
+            raise ValueError("topstep_ruleset is invalid for Apex")
+        if config.topstep_payout_path != TopStepPayoutPath.STANDARD:
+            raise ValueError("topstep_payout_path is invalid for Apex")
+        if config.topstep_use_daily_loss_limit:
+            raise ValueError("topstep_use_daily_loss_limit is invalid for Apex")
+        if config.topstep_max_back2funded_reactivations:
+            raise ValueError("topstep_max_back2funded_reactivations is invalid for Apex")
         return
 
     raise ValueError(f"unknown firm: {config.firm}")

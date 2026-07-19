@@ -8,8 +8,10 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal
 
+from src.pipeline.apex_pipeline import ApexPipelineResult, simulate_apex_pipeline
 from src.pipeline.lucidflex_pipeline import LucidFlexPipelineResult, simulate_lucidflex_pipeline
 from src.pipeline.topstep_pipeline import TopStepPipelineResult, simulate_topstep_pipeline
+from src.rules.apex import Apex50K
 from src.rules.lucidflex import LucidFlex50K
 from src.rules.topstep import TopStepNoFee50K, TopStepPayoutPath
 from src.strategies.parametric import (
@@ -21,7 +23,7 @@ from src.strategies.parametric import (
 )
 
 
-FirmName = Literal["lucidflex", "topstep"]
+FirmName = Literal["lucidflex", "topstep", "apex"]
 Strategy = (
     BernoulliTradeStrategy
     | PhaseAwareBernoulliStrategy
@@ -29,7 +31,7 @@ Strategy = (
     | AutocorrelatedPhaseAwareBernoulliStrategy
     | RegimeSwitchingPhaseAwareBernoulliStrategy
 )
-PipelineResult = LucidFlexPipelineResult | TopStepPipelineResult
+PipelineResult = LucidFlexPipelineResult | TopStepPipelineResult | ApexPipelineResult
 
 
 @dataclass(frozen=True)
@@ -97,6 +99,8 @@ def run_monte_carlo(
     topstep_payout_path: TopStepPayoutPath = TopStepPayoutPath.STANDARD,
     topstep_use_daily_loss_limit: bool = False,
     topstep_max_back2funded_reactivations: int = 0,
+    apex_ruleset: Apex50K | None = None,
+    apex_drawdown_variant: str = "eod",
     max_eval_days: int = 90,
     max_funded_days: int = 180,
     payout_cap: int | None = None,
@@ -130,6 +134,18 @@ def run_monte_carlo(
                     max_xfa_days=max_funded_days,
                     payout_cap=payout_cap,
                     max_back2funded_reactivations=topstep_max_back2funded_reactivations,
+                )
+            )
+        elif firm == "apex":
+            results.append(
+                simulate_apex_pipeline(
+                    strategy,
+                    ruleset=apex_ruleset,
+                    drawdown_variant=apex_drawdown_variant,
+                    seed=sim_seed,
+                    max_eval_days=max_eval_days,
+                    max_funded_days=max_funded_days,
+                    payout_cap=payout_cap,
                 )
             )
         else:

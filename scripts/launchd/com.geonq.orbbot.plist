@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Template. install_launchd.sh substitutes __REPO_ROOT__ with the absolute
+  path to this repo and writes the result to
+  ~/Library/LaunchAgents/com.geonq.orbbot.plist. Do not load this file
+  directly; it is not a valid installed agent until substituted.
+
+  Two StartCalendarInterval entries (14:20 and 15:20 local Mac time) cover
+  both CET and CEST relative to NY's 09:30/09:25 ET open across DST
+  transitions that don't move on the same date in Europe and the US (spec,
+  Tasks/todo.md "Phase 6B": "Schedule weekdays 14:20 AND 15:20 local").
+
+  On a normal week both fires (roughly 08:20/09:20 ET) land BEFORE the
+  trading session starts, and self-gating alone (weekday / already-traded
+  checked in should_run_today) does NOT make the second fire safe: the
+  second process would still pass that check and could place a duplicate
+  entry while the first process is still pre-entry. What actually makes
+  the second fire safe is an exclusive process lock
+  (src/live/live_runner.py's ProcessLock, fcntl.flock on
+  LiveState/orbbot.lock, reviewer Fix 1, 2026-07-19), held for the entire
+  process lifetime. The second process fails to acquire it, journals a
+  LockHeldExit event, and exits 0 immediately. Do not remove either
+  StartCalendarInterval entry believing self-gating alone covers this.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.geonq.orbbot</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>__REPO_ROOT__/scripts/launchd/run_orbbot.sh</string>
+    </array>
+
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict>
+            <key>Hour</key>
+            <integer>14</integer>
+            <key>Minute</key>
+            <integer>20</integer>
+        </dict>
+        <dict>
+            <key>Hour</key>
+            <integer>15</integer>
+            <key>Minute</key>
+            <integer>20</integer>
+        </dict>
+    </array>
+
+    <key>StandardOutPath</key>
+    <string>__REPO_ROOT__/LiveState/launchd_stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>__REPO_ROOT__/LiveState/launchd_stderr.log</string>
+
+    <key>WorkingDirectory</key>
+    <string>__REPO_ROOT__</string>
+
+    <!-- RunAtLoad is false: this must only fire on the scheduled times
+         above, never immediately when the agent is (re)loaded (e.g. after
+         a launchctl load during setup, or a Mac reboot mid-day). An
+         unexpected RunAtLoad fire could trigger a session outside the
+         intended 09:25 to 11:40 ET window, which the auto mode's own
+         weekday / already-traded gate does not fully protect against (it
+         does not gate on time of day, only date). -->
+    <key>RunAtLoad</key>
+    <false/>
+
+    <!-- KeepAlive is false: this is a scheduled batch job, not a
+         long-running daemon. It must run to completion once per trigger
+         and exit, not be restarted by launchd if it exits normally. -->
+    <key>KeepAlive</key>
+    <false/>
+
+    <key>ProcessType</key>
+    <string>Interactive</string>
+</dict>
+</plist>

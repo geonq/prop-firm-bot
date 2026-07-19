@@ -15,16 +15,18 @@ from collections.abc import Sequence
 from datetime import date, timedelta
 from typing import Literal
 
+from src.pipeline.apex_replay import simulate_apex_trade_replay
 from src.pipeline.lucidflex_replay import simulate_lucidflex_trade_replay
 from src.pipeline.monte_carlo import MonteCarloResult, summarize_pipeline_results
 from src.pipeline.topstep_replay import simulate_topstep_trade_replay
+from src.rules.apex import Apex50K
 from src.rules.lucidflex import LucidFlex50K
 from src.rules.topstep import TopStepNoFee50K, TopStepPayoutPath
 from src.sizing.dynamic import SizingFunction
 from src.strategies.replay import ReplayDay
 
 
-FirmName = Literal["lucidflex", "topstep"]
+FirmName = Literal["lucidflex", "topstep", "apex"]
 
 
 _BOOTSTRAP_DATE_ANCHOR = date(2026, 1, 5)
@@ -94,11 +96,19 @@ def run_replay_monte_carlo(
     max_combine_days: int = 90,
     max_xfa_days: int = 180,
     # LucidFlex wiring
+    lucidflex_sizing_fn: SizingFunction | None = None,
     lucidflex_ruleset: LucidFlex50K | None = None,
     lucidflex_eval_risk: float | None = None,
     lucidflex_funded_risk: float | None = None,
     max_eval_days: int = 90,
     max_funded_days: int = 180,
+    # Apex wiring
+    apex_sizing_fn: SizingFunction | None = None,
+    apex_ruleset: Apex50K | None = None,
+    apex_eval_risk: float | None = None,
+    apex_funded_risk: float | None = None,
+    apex_drawdown_variant: str = "eod",
+    apex_payout_cap: int | None = None,
 ) -> MonteCarloResult:
     """Block-bootstrap a TV trade list `n_simulations` times and aggregate.
 
@@ -107,21 +117,30 @@ def run_replay_monte_carlo(
     Bootstrapped sequence length defaults to the source length, which makes the
     CI a "what-if-resample-this-history" estimate.
 
-    For LucidFlex, both `lucidflex_eval_risk` and `lucidflex_funded_risk` must
-    be provided (mirroring the single-shot `simulate_lucidflex_trade_replay`
-    contract — Lucid replay does not currently accept a sizing function).
+    For LucidFlex and Apex, pass either `{firm}_sizing_fn` or both
+    `{firm}_eval_risk` and `{firm}_funded_risk`, mirroring the TopStep
+    `sizing_fn` either/or contract.
     """
     if n_simulations <= 0:
         raise ValueError("n_simulations must be positive")
     if firm == "lucidflex":
-        if lucidflex_eval_risk is None or lucidflex_funded_risk is None:
+        if lucidflex_sizing_fn is None and (
+            lucidflex_eval_risk is None or lucidflex_funded_risk is None
+        ):
             raise ValueError(
-                "lucidflex_eval_risk and lucidflex_funded_risk are required for firm='lucidflex'"
+                "for firm='lucidflex', pass either lucidflex_sizing_fn or both "
+                "lucidflex_eval_risk and lucidflex_funded_risk"
             )
     if firm == "topstep":
         if sizing_fn is None and (topstep_eval_risk is None or topstep_funded_risk is None):
             raise ValueError(
                 "for firm='topstep', pass either sizing_fn or both topstep_eval_risk and topstep_funded_risk"
+            )
+    if firm == "apex":
+        if apex_sizing_fn is None and (apex_eval_risk is None or apex_funded_risk is None):
+            raise ValueError(
+                "for firm='apex', pass either apex_sizing_fn or both "
+                "apex_eval_risk and apex_funded_risk"
             )
 
     sample_length = target_length if target_length is not None else len(replay_days)
@@ -156,13 +175,30 @@ def run_replay_monte_carlo(
             results.append(
                 simulate_lucidflex_trade_replay(
                     sampled,
-                    eval_risk=lucidflex_eval_risk,
-                    funded_risk=lucidflex_funded_risk,
+                    sizing_fn=lucidflex_sizing_fn,
+                    eval_risk=lucidflex_eval_risk if lucidflex_sizing_fn is None else None,
+                    funded_risk=lucidflex_funded_risk if lucidflex_sizing_fn is None else None,
                     ruleset=lucidflex_ruleset,
                     eval_cost_per_trade=eval_cost_per_trade,
                     funded_cost_per_trade=funded_cost_per_trade,
                     max_eval_days=max_eval_days,
                     max_funded_days=max_funded_days,
+                )
+            )
+        elif firm == "apex":
+            results.append(
+                simulate_apex_trade_replay(
+                    sampled,
+                    sizing_fn=apex_sizing_fn,
+                    eval_risk=apex_eval_risk if apex_sizing_fn is None else None,
+                    funded_risk=apex_funded_risk if apex_sizing_fn is None else None,
+                    ruleset=apex_ruleset,
+                    drawdown_variant=apex_drawdown_variant,
+                    eval_cost_per_trade=eval_cost_per_trade,
+                    funded_cost_per_trade=funded_cost_per_trade,
+                    max_eval_days=max_eval_days,
+                    max_funded_days=max_funded_days,
+                    payout_cap=apex_payout_cap,
                 )
             )
         else:

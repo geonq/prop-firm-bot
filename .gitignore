@@ -78,3 +78,7 @@ Research/StrategyCapture/
 !Research/StrategyCapture/
 Research/StrategyCapture/*
 !Research/StrategyCapture/README.md
+DataLocal/
+
+# Live-runner trade journals / event logs / restart-recovery state (Phase 6A)
+LiveState/
