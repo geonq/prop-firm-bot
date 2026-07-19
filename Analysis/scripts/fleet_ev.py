@@ -51,6 +51,48 @@ def _simulate(sampled):
     }
 
 
+def _rolling_replacement_net(name: str, replay_days) -> tuple[float, int]:
+    """Keep one account slot funded through the fixed horizon.
+
+    A breach consumes its breach day. A fresh same-size account starts on the
+    following available replay day; every new purchase/evaluation fee is
+    already charged by the corresponding replay function. This models fresh
+    replacement, not discounted resets or an undocumented account transfer.
+    """
+    offset = 0
+    net = 0.0
+    replacements = 0
+    while offset < len(replay_days):
+        remaining = replay_days[offset:]
+        n = len(remaining)
+        if name == "topstep":
+            result = simulate_topstep_trade_replay(
+                remaining, eval_risk=RISK, funded_risk=RISK,
+                max_combine_days=n, max_xfa_days=n,
+            )
+            breached = (not result.combine_result.passed) or result.xfa_closed
+        elif name == "lucidflex":
+            result = simulate_lucidflex_trade_replay(
+                remaining, eval_risk=RISK, funded_risk=RISK,
+                max_eval_days=n, max_funded_days=n,
+            )
+            breached = (not result.eval_result.passed) or result.funded_breached
+        elif name == "mffu_rapid":
+            result = simulate_mffu_rapid_50k(remaining, risk_per_trade=RISK)
+            breached = (not result.eval_passed) or result.funded_breached
+        else:
+            raise ValueError(f"replacement model unavailable for {name}")
+        used = result.eval_days + result.funded_days
+        if used <= 0:
+            raise RuntimeError(f"{name} replay consumed no days")
+        net += result.net_ev
+        offset += used
+        if not breached:
+            break
+        replacements += 1
+    return net, replacements
+
+
 def _quantile(values: list[float], p: float) -> float:
     return float(pd.Series(values).quantile(p, interpolation="linear"))
 
@@ -73,6 +115,8 @@ def main() -> None:
     # Correlated by construction: one sampled sequence feeds every firm in
     # each iteration. This does not pretend five copies diversify the signal.
     compliant_fleet = []  # Topstep + Lucid + MFFU: same-bot cross-firm set.
+    rolling_compliant_fleet = []
+    rolling_replacements = []
     tradeify_only = []    # Tradeify contract forbids sharing this bot cross-firm.
     illustrative_all = []
     for _ in range(N_SIMULATIONS):
@@ -90,12 +134,21 @@ def main() -> None:
         compliant = sum(monthly[n] * COUNTS[n] for n in ("topstep", "lucidflex", "mffu_rapid"))
         exclusive = monthly["tradeify_lightning"] * COUNTS["tradeify_lightning"]
         compliant_fleet.append(compliant)
+        rolling_net = 0.0
+        replacements = 0
+        for name in ("topstep", "lucidflex", "mffu_rapid"):
+            one_slot_net, one_slot_replacements = _rolling_replacement_net(name, sample)
+            rolling_net += one_slot_net * COUNTS[name]
+            replacements += one_slot_replacements * COUNTS[name]
+        rolling_compliant_fleet.append(rolling_net / len(replay_days) * TRADING_DAYS_PER_MONTH)
+        rolling_replacements.append(replacements)
         tradeify_only.append(exclusive)
         illustrative_all.append(compliant + exclusive)
 
     def band(values):
-        return {"p05_monthly": _quantile(values, .05), "median_monthly": _quantile(values, .50),
-                "mean_monthly": float(pd.Series(values).mean()), "p95_monthly": _quantile(values, .95)}
+        return {"min_sampled_monthly": min(values), "p05_monthly": _quantile(values, .05), "median_monthly": _quantile(values, .50),
+                "mean_monthly": float(pd.Series(values).mean()), "p95_monthly": _quantile(values, .95),
+                "max_sampled_monthly": max(values)}
 
     per_account = {}
     for name, values in firm_monthlies.items():
@@ -107,9 +160,13 @@ def main() -> None:
               "n_simulations": N_SIMULATIONS, "block_size_trading_days": BLOCK_SIZE,
               "scenario_horizon_trading_days": len(replay_days), "account_counts": COUNTS, "firm_per_account": per_account,
               "fleet": {"compliance_feasible_same_bot": band(compliant_fleet),
+                        "compliance_fleet_with_fresh_replacements": {
+                            **band(rolling_compliant_fleet),
+                            "mean_replacements_per_257d": float(pd.Series(rolling_replacements).mean()),
+                        },
                         "tradeify_exclusive_five_account_scenario": band(tradeify_only),
                         "illustrative_all_20_accounts_NOT_COMPLIANT": band(illustrative_all)},
-              "interpretation": "p05/p95 are fixed-horizon scenario percentiles, not literal worst/best. pipeline_throughput_mean_monthly follows the established net-EV / mean-pipeline-days convention. Same sampled blocks drive all firms; there is no independence assumption. Tradeify prohibits using its bot across firms, so its five-account result cannot be added to the same ORB bot fleet."}
+              "interpretation": "p05/p95 are fixed-horizon scenario percentiles, not literal worst/best. compliance_fleet_with_fresh_replacements buys a fresh same-size account on the session after every breach, charging the published purchase/eval fee each time; it does not assume reset discounts. Same sampled blocks drive all firms; there is no independence assumption. Tradeify prohibits using its bot across firms, so its five-account result cannot be added to the same ORB bot fleet."}
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(record, indent=2))
     print(json.dumps(record, indent=2))
