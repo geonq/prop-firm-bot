@@ -112,6 +112,10 @@ class SessionErrored(RuntimeError):
         super().__init__(f"session errored ({type(original).__name__}: {original}); {state}")
 
 
+class CooperativeStopRequested(RuntimeError):
+    """Internal control-flow signal raised when the operator requests stop."""
+
+
 def _build_client() -> ProjectXClient:
     creds = load_projectx_credentials()
     return ProjectXClient(RequestsTransport(), username=creds.username, api_key=creds.api_key)
@@ -165,6 +169,7 @@ def run_live_or_paper_session(
     client_factory: Callable[[], ProjectXClient] = _build_client,
     feed_factory: Callable[[ProjectXClient, str, date, TradeJournal, Callable[[], None]], LiveBarFeed] = _default_feed_factory,
     sleep: Callable[[float], None] = time.sleep,
+    stop_requested: Callable[[], bool] = lambda: False,
 ) -> list[FilledTrade]:
     """Runs ONE real trading session (today) via LiveBarFeed + PaperBroker or LiveBroker.
 
@@ -327,6 +332,8 @@ def run_live_or_paper_session(
 
     def _on_wait_tick() -> None:
         nonlocal wait_tick_count
+        if stop_requested():
+            raise CooperativeStopRequested("operator requested cooperative stop")
         if mode != "live" or halted or not isinstance(broker, LiveBroker) or broker.position is None:
             return
         wait_tick_count += 1
@@ -344,6 +351,8 @@ def run_live_or_paper_session(
         for bar in feed:
             last_bar = bar
             last_known_price = bar.close
+            if stop_requested():
+                raise CooperativeStopRequested("operator requested cooperative stop")
 
             if not halted and broker.position is not None:
                 mtm_pnl = runner_state.realized_pnl_usd + broker.unrealized_pnl_usd(bar.close)
@@ -391,6 +400,19 @@ def run_live_or_paper_session(
                     snapshot = broker.place_bracket(
                         session_date=ev.session_date, direction=ev.direction, entry_price=ev.entry_price,
                         stop_price=ev.stop_price, target_price=ev.target_price, contracts=contracts, entry_ts=ev.entry_ts,
+                        target_r=FROZEN_PARAMS.target_r,
+                    )
+                    # LiveBroker returns exchange-confirmed fill/target values;
+                    # make those the engine's source of truth for exits and MFE.
+                    engine.restore_session(
+                        session_date=snapshot.session_date,
+                        trade_taken=True,
+                        direction=snapshot.direction,
+                        entry_ts=pd.Timestamp(snapshot.entry_ts),
+                        entry_price=snapshot.entry_price,
+                        stop_price=snapshot.stop_price,
+                        target_price=snapshot.target_price,
+                        risk_points=snapshot.risk_points,
                     )
                     runner_state.trade_taken = True
                     runner_state.position = snapshot
@@ -425,6 +447,34 @@ def run_live_or_paper_session(
                     runner_state.position = None
                     runner_state.save()
 
+    except CooperativeStopRequested:
+        if broker.position is not None:
+            exit_ts = last_bar.ts if last_bar is not None else datetime.now(ET)
+            exit_price = last_bar.close if last_bar is not None else broker.position.entry_price
+            last_error = ""
+            for attempt in range(FLATTEN_RETRY_ATTEMPTS):
+                try:
+                    _flatten_and_record(
+                        broker=broker, journal=journal, runner_state=runner_state, filled_trades=filled_trades,
+                        exit_ts=exit_ts, exit_price=exit_price, exit_reason="cooperative_stop",
+                    )
+                    break
+                except Exception as exc:  # noqa: BLE001 - safety retry boundary
+                    last_error = f"{type(exc).__name__}: {exc}"
+                    journal.record_event(
+                        "CooperativeStopFlattenRetryFailed",
+                        {"attempt": attempt + 1, "max_attempts": FLATTEN_RETRY_ATTEMPTS, "error": last_error},
+                    )
+                    if attempt < FLATTEN_RETRY_ATTEMPTS - 1:
+                        sleep(FLATTEN_RETRY_BACKOFF_SECONDS[attempt])
+            if broker.position is not None:
+                journal.record_event(
+                    "NakedPositionAlarm",
+                    {"message": "cooperative stop could not confirm flatten; verify TopstepX immediately", "last_error": last_error},
+                )
+                raise SessionErrored(CooperativeStopRequested("flatten failed"), flattened=False)
+        journal.record_event("CooperativeStopAcknowledged", {"session_date": str(session_date), "flattened": True})
+        return filled_trades
     except LiveFeedSkipDay as exc:
         journal.record_event("LiveFeedSkipDay", {"session_date": str(exc.session_date), "reason": exc.reason})
         return filled_trades
@@ -746,6 +796,7 @@ def run_auto(
     sleep_fn=None,
     client_factory: Callable[[], ProjectXClient] = _build_client,
     feed_factory: Callable[[ProjectXClient, str, date, TradeJournal, Callable[[], None]], LiveBarFeed] = _default_feed_factory,
+    stop_requested: Callable[[], bool] = lambda: False,
 ) -> int:
     """--auto: acquire the exclusive process lock, self-gate on session
     calendar, wait until 09:25 ET, run the session, flatten by EoD (handled
@@ -788,6 +839,7 @@ def run_auto(
             mode=mode, state_dir=state_dir, risk_per_trade_usd=risk_per_trade_usd, max_contracts=max_contracts,
             daily_loss_cap_usd=daily_loss_cap_usd, account_name_hint=account_name_hint, now_fn=now_fn,
             sleep_fn=sleep_fn, client_factory=client_factory, feed_factory=feed_factory, today=today,
+            stop_requested=stop_requested,
         )
     finally:
         lock.release()
@@ -806,6 +858,7 @@ def _run_auto_locked(
     client_factory: Callable[[], ProjectXClient],
     feed_factory: Callable[[ProjectXClient, str, date, TradeJournal, Callable[[], None]], LiveBarFeed] = _default_feed_factory,
     today: date,
+    stop_requested: Callable[[], bool] = lambda: False,
 ) -> int:
     """The original run_auto body, now running under the exclusive lock (see run_auto)."""
     should_run, reason = should_run_today(today, state_dir=state_dir)
@@ -822,6 +875,9 @@ def _run_auto_locked(
     # ever reaching the session.
     max_wait_iterations = 100_000
     for _ in range(max_wait_iterations):
+        if stop_requested():
+            print("--auto: cooperative stop acknowledged while waiting")
+            return 0
         if now_fn() >= wait_until:
             break
         remaining = (wait_until - now_fn()).total_seconds()
@@ -853,6 +909,7 @@ def _run_auto_locked(
             mode=mode, session_date=today, state_dir=state_dir, risk_per_trade_usd=risk_per_trade_usd,
             max_contracts=max_contracts, daily_loss_cap_usd=daily_loss_cap_usd, account_name_hint=account_name_hint,
             client_factory=client_factory, feed_factory=feed_factory, sleep=sleep_fn,
+            stop_requested=stop_requested,
         )
         _print_summary(trades)
     except SessionErrored as exc:

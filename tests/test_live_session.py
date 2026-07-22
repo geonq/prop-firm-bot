@@ -33,8 +33,42 @@ from src.live.projectx import (
     TransportResponse,
 )
 from src.live.feed import Bar, ET
+from src.live.config import FROZEN_PARAMS
+from src.live.engine import ORBLiveEngine
 
 ET_TZ = ZoneInfo("America/New_York")
+
+
+def test_engine_opens_immediately_after_final_or_bar_without_waiting_for_0935_close():
+    """A completed-bar live feed receives 09:34 near 09:35:02.
+
+    The signal is fully known then, so waiting for the completed 09:35 bar would
+    defer the order until roughly 09:36 and then model a retroactive 09:35-open
+    fill. The engine must instead emit the entry from the final OR bar, using
+    its close as the contemporaneous paper reference and 09:35 as entry time.
+    """
+    d = date(2026, 7, 20)
+    engine = ORBLiveEngine.from_params(FROZEN_PARAMS)
+    all_events = []
+    for minute, close in enumerate([100.0, 100.25, 100.5, 100.75, 101.0], start=30):
+        all_events.extend(
+            engine.on_bar(
+                Bar(
+                    ts=_minute(d, 9, minute),
+                    session_date=d,
+                    open=100.0,
+                    high=max(101.25, close),
+                    low=99.5,
+                    close=close,
+                    volume=10,
+                )
+            )
+        )
+
+    opened = [event for event in all_events if type(event).__name__ == "TradeOpened"]
+    assert len(opened) == 1
+    assert opened[0].entry_ts == _minute(d, 9, 35)
+    assert opened[0].entry_price == pytest.approx(101.25)  # 09:34 close + one adverse tick
 
 
 class ScriptedTransport:
@@ -452,9 +486,10 @@ def test_live_mode_wait_tick_does_not_poll_oco_before_the_tenth_tick(tmp_path):
     )
     assert len(trades) == 1
     assert trades[0].exit_reason == "target"
-    # Closed via next_bar's per-bar poll (its ts), NOT via any wait-tick --
-    # confirms the 9 sub-threshold ticks polled nothing.
-    assert trades[0].exit_ts == str(next_bar.ts)
+    # Entry is now emitted immediately after the completed 09:34 OR bar, so
+    # the first post-entry per-bar OCO poll occurs on the 09:35 bar. The nine
+    # wait ticks still must not consume the sole queued searchOpen response.
+    assert trades[0].exit_ts == str(entry_bars[-1].ts)
 
 
 def test_paper_mode_wait_ticks_never_poll_oco(tmp_path):
@@ -740,3 +775,20 @@ def test_paper_mode_doji_produces_no_trade(tmp_path):
     assert trades == []
     events_text = (tmp_path / "events.jsonl").read_text()
     assert "NoTradeToday" in events_text
+
+
+def test_cooperative_stop_before_first_bar_acknowledges_without_entry(tmp_path):
+    d = date(2026, 7, 20)
+    transport = ScriptedTransport()
+    _setup_auth_account_contract(transport)
+    bars = [_bar(d, 9, 30, o=100.0, h=101.0, l=99.0, c=100.5)]
+
+    trades = run_live_or_paper_session(
+        mode="paper", session_date=d, state_dir=tmp_path,
+        client_factory=_client_factory(transport),
+        feed_factory=lambda client, contract_id, session_date, journal, on_wait_tick=None: ScriptedBarFeed(bars),
+        stop_requested=lambda: True,
+    )
+
+    assert trades == []
+    assert "CooperativeStopAcknowledged" in (tmp_path / "events.jsonl").read_text()

@@ -487,6 +487,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--end", type=str, help="YYYY-MM-DD (replay mode)")
     parser.add_argument("--parquet", type=Path, default=DEFAULT_PARQUET)
     parser.add_argument("--state-dir", type=Path, default=DEFAULT_STATE_DIR)
+    parser.add_argument("--control-dir", type=Path, default=None, help="cooperative control-state directory")
     parser.add_argument("--risk", type=float, default=RISK_PER_TRADE_USD)
     parser.add_argument("--max-contracts", type=int, default=DEFAULT_MAX_CONTRACTS)
     parser.add_argument("--daily-loss-cap", type=float, default=DEFAULT_DAILY_LOSS_CAP_USD)
@@ -494,6 +495,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--preflight", action="store_true", help="validate creds/auth/account/contract/clock, place no orders")
     parser.add_argument("--auto", action="store_true", help="self-gate on session calendar, wait, run, report, exit (requires --mode paper|live)")
     args = parser.parse_args(argv)
+
+    if args.control_dir is not None:
+        from src.ops.control import ControlStore
+
+        control_store = ControlStore(args.control_dir)
+        stop_requested = lambda: control_store.load()["requested_mode"] == "stopped"
+    else:
+        stop_requested = lambda: False
 
     if args.preflight:
         from src.live.live_runner import print_preflight, run_preflight
@@ -514,6 +523,7 @@ def main(argv: list[str] | None = None) -> int:
             max_contracts=args.max_contracts,
             daily_loss_cap_usd=args.daily_loss_cap,
             account_name_hint=args.account_name,
+            stop_requested=stop_requested,
         )
 
     if args.mode in ("paper", "live"):
@@ -529,6 +539,7 @@ def main(argv: list[str] | None = None) -> int:
             max_contracts=args.max_contracts,
             daily_loss_cap_usd=args.daily_loss_cap,
             account_name_hint=args.account_name,
+            stop_requested=stop_requested,
         )
         _print_summary(trades)
         return 0

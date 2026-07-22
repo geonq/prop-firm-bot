@@ -75,6 +75,13 @@ close-labeled, STOP — do not proceed to `--mode live` or even
 and time-stop timestamp the engine computes would be silently off by one
 bar-width.
 
+With open-labeled completed bars, the engine completes the five-minute OR as
+soon as the 09:34 bar is served (normally near 09:35:02), emits the entry with
+09:35 as its logical timestamp, and uses the 09:34 close only as the sizing
+reference. It must not wait for the completed 09:35 bar. In live mode the
+exchange-confirmed market fill replaces that reference in engine state, and
+the 4R target is recalculated from the actual fill against the fixed OR stop.
+
 ### What cannot be verified without credentials
 
 - The exact `Authorization` header format (see `src/live/projectx.py`
@@ -256,3 +263,58 @@ human-reviewed comparison: does live performance track the modeled
 expectation closely enough to keep running, scale up, or should the whole
 approach be revisited? That review is a deliberate, scheduled human
 decision — not a mechanism this bot performs on its own.
+
+## 11. Windows Telegram controller and recovery
+
+The Windows controller exposes operator-only `/starttrading`, `/stoptrading`,
+and `/tradingstatus`. `TRADING_MODE` defaults to `paper`; leave it unset until
+paper validation is accepted. The controller runs the same preflight as the
+CLI and records a stopped state on any failure. A successful stop reply means
+cooperative stop intent was durably recorded; only `/tradingstatus` with a
+stopped runner and broker-flat confirmation is authoritative.
+
+Credential placement remains the repository-root `.env` and nowhere else:
+
+```text
+PROJECTX_USERNAME=...
+PROJECTX_API_KEY=...
+TELEGRAM_CONTROLLER_BOT_TOKEN=...      # needed for autonomous lifecycle alerts
+TELEGRAM_CONTROLLER_CHAT_ID=<operator_chat_id> # alert destination
+```
+
+The controller bot already has its own Telegram token in Hermes configuration;
+do not copy or print that value unnecessarily. The final two `.env` entries are
+only needed when the independent trading supervisor must send lifecycle alerts
+after a controller restart. The notification outbox stays pending and retries
+if they are absent.
+
+Install/reinstall fail-closed recovery from a non-elevated PowerShell terminal:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/windows/install_trading_supervisor_task.ps1
+```
+
+The task runs every five minutes. It does nothing while desired state is
+`stopped`; it only attempts preflight/recovery when a previously requested
+paper/live mode is active. Inspect it with:
+
+```powershell
+schtasks.exe /Query /TN ORBTradingSupervisorWatchdog /FO LIST /V
+```
+
+Generate the local operational dashboard with:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/windows/write_trading_dashboard.ps1
+```
+
+Live mode has a second explicit gate. After at least ten accepted paper
+sessions and personal report review, create `LiveState/control/live_activation.json`
+with the following schema (this file is local state and gitignored):
+
+```json
+{"approved": true, "paper_acceptance": true, "approved_by": "geonq"}
+```
+
+An absent, malformed, or incomplete artifact keeps live mode locked. Creating
+it is an explicit human approval; the automation never creates it itself.

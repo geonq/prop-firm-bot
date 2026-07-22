@@ -330,11 +330,29 @@ class ORBLiveEngine:
             state.or_low = min(state.or_low, bar.low)
             state.or_close = bar.close
             state.or_bars_seen += 1
+            # Completed bars are timestamped by minute start. Once 09:34 is
+            # served near 09:35:02, the five-minute OR is fully known and the
+            # order can be sent. Waiting for completed 09:35 data would defer
+            # execution to ~09:36 and model a retroactive 09:35-open fill.
+            if bar.ts + timedelta(minutes=1) >= state.or_end_ts:
+                return self._complete_opening_range(
+                    state,
+                    entry_ts=state.or_end_ts,
+                    reference_price=bar.close,
+                )
             return []
 
-        # This bar is the first bar at/after the OR window close: OR is now complete,
-        # and (for first_candle mode) this bar is also the entry-decision bar whose
-        # OPEN fills the trade.
+        # Defensive path for a sparse/replayed feed that reaches a post-OR bar
+        # without completing on the final expected OR minute.
+        return self._complete_opening_range(state, entry_ts=bar.ts, reference_price=bar.open)
+
+    def _complete_opening_range(
+        self,
+        state: _SessionState,
+        *,
+        entry_ts,
+        reference_price: float,
+    ) -> list[EngineEvent]:
         state.or_complete = True
         or_range = state.or_high - state.or_low
         body = abs(state.or_close - state.or_open)
@@ -347,26 +365,26 @@ class ORBLiveEngine:
         state.entry_signal_direction = direction
         state.entry_bar_pending = True
         events: list[EngineEvent] = [
-            EntryIntent(session_date=state.session_date, direction=direction, signal_ts=bar.ts)
+            EntryIntent(session_date=state.session_date, direction=direction, signal_ts=entry_ts)
         ]
-        events.extend(self._fill_entry(state, bar))
-        events.extend(self._process_position_bar(state, bar))
+        events.extend(self._fill_entry_at(state, entry_ts=entry_ts, reference_price=reference_price))
         return events
 
     def _fill_entry(self, state: _SessionState, bar: Bar) -> list[EngineEvent]:
+        return self._fill_entry_at(state, entry_ts=bar.ts, reference_price=bar.open)
+
+    def _fill_entry_at(self, state: _SessionState, *, entry_ts, reference_price: float) -> list[EngineEvent]:
         if not state.entry_bar_pending:
             return []
         direction = state.entry_signal_direction
         assert direction is not None
         entry_side: OrderSide = "buy" if direction == "long" else "sell"
-        entry_price = fill_price(bar.open, self.tick_size, self.slippage_ticks, entry_side)
+        entry_price = fill_price(reference_price, self.tick_size, self.slippage_ticks, entry_side)
         stop_price = state.or_low if direction == "long" else state.or_high
         risk = abs(entry_price - stop_price)
 
         state.entry_bar_pending = False
         if risk <= 0:
-            # Degenerate risk (entry == stop after slippage): no trade, matches
-            # _simulate_session's `if risk <= 0: return None`.
             state.direction = None
             state.no_trade_reason = "zero_risk"
             return [NoTradeToday(session_date=state.session_date, reason="zero_risk")]
@@ -374,14 +392,14 @@ class ORBLiveEngine:
         target_price = entry_price + self.target_r * risk if direction == "long" else entry_price - self.target_r * risk
 
         state.direction = direction
-        state.entry_ts = bar.ts
+        state.entry_ts = entry_ts
         state.entry_price = entry_price
         state.stop_price = stop_price
         state.target_price = target_price
         state.risk_points = risk
         state.mfe_r = float("-inf")
         state.time_stop_deadline = (
-            bar.ts + timedelta(minutes=self.time_stop_minutes) if self.time_stop_minutes else None
+            entry_ts + timedelta(minutes=self.time_stop_minutes) if self.time_stop_minutes else None
         )
         state.pending_exit_reason = None
         state.trade_taken = True
@@ -390,7 +408,7 @@ class ORBLiveEngine:
             TradeOpened(
                 session_date=state.session_date,
                 direction=direction,
-                entry_ts=bar.ts,
+                entry_ts=entry_ts,
                 entry_price=entry_price,
                 stop_price=stop_price,
                 target_price=target_price,

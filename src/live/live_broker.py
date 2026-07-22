@@ -236,6 +236,7 @@ class LiveBroker:
         target_price: float | None,
         contracts: int,
         entry_ts,
+        target_r: float | None = None,
     ) -> PositionSnapshot:
         """Market entry, polled to fill, then exchange-resident stop + target working orders.
 
@@ -300,6 +301,16 @@ class LiveBroker:
                  (real_entry_price - entry_price) if direction == "long" else (entry_price - real_entry_price)
              )},
         )
+
+        # The OR stop remains fixed, but preserve the configured R multiple
+        # against the exchange-confirmed fill rather than the modeled quote.
+        if target_price is not None and target_r is not None:
+            actual_risk = abs(real_entry_price - stop_price)
+            target_price = (
+                real_entry_price + target_r * actual_risk
+                if direction == "long"
+                else real_entry_price - target_r * actual_risk
+            )
 
         exit_side = ORDER_SIDE_ASK if direction == "long" else ORDER_SIDE_BID
         stop_order_id = self.client.place_order(

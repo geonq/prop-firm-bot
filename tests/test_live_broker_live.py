@@ -138,6 +138,7 @@ def test_place_bracket_places_market_entry_then_stop_and_target():
         entry_price=20000.0,  # modeled
         stop_price=19985.0,
         target_price=20060.0,
+        target_r=4.0,
         contracts=3,
         entry_ts="2026-07-18T09:35:00-04:00",
     )
@@ -145,7 +146,7 @@ def test_place_bracket_places_market_entry_then_stop_and_target():
     assert snapshot.entry_price == 20001.5  # REAL fill, not the modeled 20000.0
     assert snapshot.contracts == 3
     assert snapshot.stop_price == 19985.0
-    assert snapshot.target_price == 20060.0
+    assert snapshot.target_price == 20067.5  # actual fill + 4 * (actual fill - fixed OR stop)
 
     # entry, stop, target placed in that order
     place_calls = [c for c in transport.calls if c[0] == "/api/Order/place"]
@@ -154,7 +155,7 @@ def test_place_bracket_places_market_entry_then_stop_and_target():
     assert place_calls[1][1]["type"] == ORDER_TYPE_STOP
     assert place_calls[1][1]["stopPrice"] == 19985.0
     assert place_calls[2][1]["type"] == ORDER_TYPE_LIMIT
-    assert place_calls[2][1]["limitPrice"] == 20060.0
+    assert place_calls[2][1]["limitPrice"] == 20067.5
 
     event_types = [e for e, _ in log]
     assert "LiveOrderPlaced" in event_types

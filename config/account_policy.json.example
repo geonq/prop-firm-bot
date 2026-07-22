@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "default_policy": "monitor_only",
+  "max_concurrent_accounts": 1,
+  "auto_enroll_new_accounts": false,
+  "account_rules": [],
+  "notes": "Fail closed. New ProjectX accounts are monitored and alerted but are not traded until an explicit rule mapping and account-name selection are configured."
+}

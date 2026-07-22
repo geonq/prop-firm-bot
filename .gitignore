@@ -8,6 +8,7 @@ __pycache__/
 *.pyc
 .vscode/
 .openclaw/
+.hermes/
 .ipynb_checkpoints/
 *.egg-info/
 .pytest_cache/

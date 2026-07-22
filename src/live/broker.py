@@ -102,6 +102,7 @@ class Broker(Protocol):
         target_price: float | None,
         contracts: int,
         entry_ts,
+        target_r: float | None = None,
     ) -> PositionSnapshot: ...
 
     def close_position(self, *, exit_ts, exit_price: float, exit_reason: str) -> FilledTrade: ...
@@ -140,6 +141,7 @@ class PaperBroker:
         target_price: float | None,
         contracts: int,
         entry_ts,
+        target_r: float | None = None,
     ) -> PositionSnapshot:
         if self._position is not None:
             raise RuntimeError("PaperBroker already has an open position; flatten before opening a new one")
